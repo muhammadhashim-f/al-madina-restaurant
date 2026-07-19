@@ -121,8 +121,7 @@ export default function Hero() {
           <div className="flex justify-center lg:justify-end">
             <div className="am-arch-frame w-full max-w-[420px] aspect-[420/480]">
               <span className="am-arch-glow" />
-              <img
-                src="/al-madina-restaurant/public/Images/Hero.jpg"
+              <img src="https://cdn.corenexis.com/f/Uc2noCBMm86.jpg"
                 alt="Signature dish at Al Madina Restaurant"
               />
             </div>
