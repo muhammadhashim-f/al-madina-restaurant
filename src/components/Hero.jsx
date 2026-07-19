@@ -122,7 +122,7 @@ export default function Hero() {
             <div className="am-arch-frame w-full max-w-[420px] aspect-[420/480]">
               <span className="am-arch-glow" />
               <img
-                src="/src/Images/Hero.jpg"
+                src="/al-madina-restaurant/public/Images/Hero.jpg"
                 alt="Signature dish at Al Madina Restaurant"
               />
             </div>
