@@ -9,12 +9,11 @@ import { X } from "lucide-react";
 // ============================================================
 
 const GALLERY_IMAGES = [
-  { id: 1, src: "https://images.unsplash.com/photo-1544025162-d76694265947?q=80&w=700&auto=format&fit=crop", alt: "Signature grilled platter" },
-  { id: 2, src: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=700&auto=format&fit=crop", alt: "Restaurant dining area" },
-  { id: 3, src: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?q=80&w=700&auto=format&fit=crop", alt: "Chicken biryani" },
-  { id: 4, src: "https://images.unsplash.com/photo-1552566626-52f8b828add9?q=80&w=700&auto=format&fit=crop", alt: "Table setting" },
-  { id: 5, src: "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?q=80&w=700&auto=format&fit=crop", alt: "Mutton karahi" },
-  { id: 6, src: "https://images.unsplash.com/photo-1517244683847-7456b63c5969?q=80&w=700&auto=format&fit=crop", alt: "Restaurant interior" },
+  { id: 1, src: "Signature grilled platter.jpg", alt: "Signature grilled platter" },
+  { id: 2, src: "Restaurant dining area.webp", alt: "Restaurant dining area" },
+  { id: 3, src: "Chicken biryani.webp", alt: "Chicken biryani" },
+  { id: 4, src: "Table setting.webp", alt: "Table setting" },
+  { id: 5, src: "Mutton karahi.webp", alt: "Mutton karahi" },
 ];
 
 export default function Gallery() {

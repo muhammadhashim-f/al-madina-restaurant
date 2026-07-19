@@ -2,14 +2,6 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { UtensilsCrossed, CalendarCheck } from "lucide-react";
 
-// ============================================================
-// AL MADINA RESTAURANT — Hero Section (Home page)
-// Matches Navbar/Footer theme: black background, gold accents,
-// white text, Amiri display font for the headline.
-// Signature: the food photo is masked into the same arch shape
-// used in the logo — ties the whole brand together visually.
-// ============================================================
-
 export default function Hero() {
   return (
     <section
@@ -116,16 +108,7 @@ export default function Hero() {
               </Link>
             </div>
           </div>
-
-          {/* Right: arch-framed signature dish photo */}
-          <div className="flex justify-center lg:justify-end">
-            <div className="am-arch-frame w-full max-w-[420px] aspect-[420/480]">
-              <span className="am-arch-glow" />
-              <img src="https://cdn.corenexis.com/f/Uc2noCBMm86.jpg"
-                alt="Signature dish at Al Madina Restaurant"
-              />
-            </div>
-          </div>
+          <img src="../Images/Hero/Hero.jpg" alt="Restaurant" />
         </div>
       </div>
     </section>

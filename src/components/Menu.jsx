@@ -5,12 +5,7 @@ import { useCart } from "../context/CartContext";
 import { useFavorites } from "../context/FavoritesContext";
 import { flyToCart } from "../utils/flyToCart";
 
-// ============================================================
-// AL MADINA RESTAURANT — Menu Section
-// Matches theme: black background, gold accents, white text.
-// Category tabs + live search + veg/spice tags + discount badge.
-// Replace MENU_ITEMS with real dishes, prices, and photo URLs.
-// ============================================================
+
 
 const CATEGORIES = ["All", "Starters", "Mains", "Desserts", "Drinks"];
 
@@ -23,7 +18,7 @@ const MENU_ITEMS = [
     isVeg: false,
     spicy: true,
     discount: 0,
-    image: "https://images.unsplash.com/photo-1599487488170-d11ec9c172f0?q=80&w=600&auto=format&fit=crop",
+    image: "../images/menu/Chicken Seekh Kebab.jpg",
     description: "Char-grilled minced chicken skewers with house spices.",
   },
   {
@@ -34,7 +29,7 @@ const MENU_ITEMS = [
     isVeg: true,
     spicy: false,
     discount: 20,
-    image: "https://images.unsplash.com/photo-1601050690597-df0568f70950?q=80&w=600&auto=format&fit=crop",
+    image: "Vegetable Samosa.jpg",
     description: "Crisp pastry filled with spiced potatoes and peas.",
   },
   {
@@ -45,7 +40,7 @@ const MENU_ITEMS = [
     isVeg: false,
     spicy: true,
     discount: 0,
-    image: "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?q=80&w=600&auto=format&fit=crop",
+    image: "Mutton Karahi.jpg",
     description: "Slow-cooked mutton in a rich tomato and ginger gravy.",
   },
   {
@@ -56,7 +51,7 @@ const MENU_ITEMS = [
     isVeg: false,
     spicy: true,
     discount: 20,
-    image: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?q=80&w=600&auto=format&fit=crop",
+    image: "Chicken Biryani.jpg",
     description: "Fragrant basmati rice layered with spiced chicken.",
   },
   {
@@ -67,7 +62,7 @@ const MENU_ITEMS = [
     isVeg: true,
     spicy: false,
     discount: 0,
-    image: "https://images.unsplash.com/photo-1546833999-b9f581a1996d?q=80&w=600&auto=format&fit=crop",
+    image: "Dal-Makhani.jpg",
     description: "Black lentils simmered overnight with butter and cream.",
   },
   {
@@ -78,7 +73,7 @@ const MENU_ITEMS = [
     isVeg: true,
     spicy: false,
     discount: 0,
-    image: "https://images.unsplash.com/photo-1666190092208-b704f65a7cd4?q=80&w=600&auto=format&fit=crop",
+    image: "Gulab Jamun.jpg",
     description: "Warm milk dumplings soaked in cardamom syrup.",
   },
   {
@@ -89,7 +84,7 @@ const MENU_ITEMS = [
     isVeg: true,
     spicy: false,
     discount: 0,
-    image: "https://images.unsplash.com/photo-1571934811356-5cc061b6821f?q=80&w=600&auto=format&fit=crop",
+    image: "Kashmiri_Chai.png",
     description: "Pink tea with pistachio and rose petal garnish.",
   },
   {
@@ -100,7 +95,7 @@ const MENU_ITEMS = [
     isVeg: true,
     spicy: false,
     discount: 0,
-    image: "https://images.unsplash.com/photo-1621263764928-df1444c5e859?q=80&w=600&auto=format&fit=crop",
+    image: "Fresh Lime Soda.jpg",
     description: "Chilled soda with fresh lime, mint, and a hint of salt.",
   },
 ];
