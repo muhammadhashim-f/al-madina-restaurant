@@ -9,11 +9,11 @@ import { X } from "lucide-react";
 // ============================================================
 
 const GALLERY_IMAGES = [
-  { id: 1, src: "Signature grilled platter.jpg", alt: "Signature grilled platter" },
-  { id: 2, src: "Restaurant dining area.webp", alt: "Restaurant dining area" },
-  { id: 3, src: "Chicken biryani.webp", alt: "Chicken biryani" },
-  { id: 4, src: "Table setting.webp", alt: "Table setting" },
-  { id: 5, src: "Mutton karahi.webp", alt: "Mutton karahi" },
+  { id: 1, src: "../images/Gallery/Signature grilled platter.jpg", alt: "Signature grilled platter" },
+  { id: 2, src: "../images/Gallery/Restaurant dining area.webp", alt: "Restaurant dining area" },
+  { id: 3, src: "../images/Gallery/Chicken biryani.webp", alt: "Chicken biryani" },
+  { id: 4, src: "../images/Gallery/Table setting.webp", alt: "Table setting" },
+  { id: 5, src: "../images/Gallery/Mutton karahi.webp", alt: "Mutton karahi" },
 ];
 
 export default function Gallery() {

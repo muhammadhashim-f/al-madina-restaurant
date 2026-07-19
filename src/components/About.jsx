@@ -88,7 +88,7 @@ export default function About() {
           {/* Image with chef badge */}
           <div className="am-about-frame mb-6 lg:mb-0">
             <img
-              src="/Images/Gallery/Chef.avif"
+              src="../Images/Gallery/Chef.avif"
               alt="Al Madina Restaurant kitchen"
             />
             <div className="am-chef-badge">
