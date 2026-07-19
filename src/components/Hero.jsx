@@ -89,7 +89,7 @@ export default function Hero() {
             </p>
             <h1 className="am-hero-heading text-4xl sm:text-5xl lg:text-6xl font-bold mb-6">
               Where every dish <br />
-              tells a New <span className="accent">story</span>
+              tells a <span className="accent">story</span>
             </h1>
             <p
               className="text-base sm:text-lg mb-9 max-w-md leading-relaxed"
