@@ -29,7 +29,7 @@ const MENU_ITEMS = [
     isVeg: true,
     spicy: false,
     discount: 20,
-    image: "Vegetable Samosa.jpg",
+    image: "../Images/menu/Vegetable Samosa.jpg",
     description: "Crisp pastry filled with spiced potatoes and peas.",
   },
   {
@@ -40,7 +40,7 @@ const MENU_ITEMS = [
     isVeg: false,
     spicy: true,
     discount: 0,
-    image: "Mutton Karahi.jpg",
+    image: "../Images/menu/Mutton Karahi.jpg",
     description: "Slow-cooked mutton in a rich tomato and ginger gravy.",
   },
   {
@@ -51,7 +51,7 @@ const MENU_ITEMS = [
     isVeg: false,
     spicy: true,
     discount: 20,
-    image: "Chicken Biryani.jpg",
+    image: "../Images/menu/Chicken Biryani.jpg",
     description: "Fragrant basmati rice layered with spiced chicken.",
   },
   {
@@ -62,7 +62,7 @@ const MENU_ITEMS = [
     isVeg: true,
     spicy: false,
     discount: 0,
-    image: "Dal-Makhani.jpg",
+    image: "../Images/menu/Dal-Makhani.jpg",
     description: "Black lentils simmered overnight with butter and cream.",
   },
   {
@@ -73,7 +73,7 @@ const MENU_ITEMS = [
     isVeg: true,
     spicy: false,
     discount: 0,
-    image: "Gulab Jamun.jpg",
+    image: "../Images/menu/Gulab Jamun.jpg",
     description: "Warm milk dumplings soaked in cardamom syrup.",
   },
   {
@@ -84,7 +84,7 @@ const MENU_ITEMS = [
     isVeg: true,
     spicy: false,
     discount: 0,
-    image: "Kashmiri_Chai.png",
+    image: "../Images/menu/Kashmiri_Chai.png",
     description: "Pink tea with pistachio and rose petal garnish.",
   },
   {
@@ -95,7 +95,7 @@ const MENU_ITEMS = [
     isVeg: true,
     spicy: false,
     discount: 0,
-    image: "Fresh Lime Soda.jpg",
+    image: "../Images/menu/Fresh Lime Soda.jpg",
     description: "Chilled soda with fresh lime, mint, and a hint of salt.",
   },
 ];
