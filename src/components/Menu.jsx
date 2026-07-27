@@ -95,7 +95,11 @@ const MENU_ITEMS = [
     isVeg: true,
     spicy: false,
     discount: 0,
-    image: "../Images/menu/Fresh Lime Soda.jpg",
+  {
+    "../Images/menu/Fresh Lime Soda.jpg",
+    "/Images/menu/chicken-seekh-kebab-2.jpg",
+    "/Images/menu/chicken-seekh-kebab-3.jpg",
+  },
     description: "Chilled soda with fresh lime, mint, and a hint of salt.",
   },
 ];
