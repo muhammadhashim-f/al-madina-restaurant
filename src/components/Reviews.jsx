@@ -1,14 +1,23 @@
 import React, { useState } from "react";
-import { Star, ShieldCheck, CheckCircle2, AlertCircle, Sparkles, MessageSquareHeart } from "lucide-react";
+import {
+  Star,
+  ShieldCheck,
+  CheckCircle2,
+  AlertCircle,
+  MessageSquareHeart,
+  Loader2,
+} from "lucide-react";
 import { useReviews } from "../context/ReviewsContext";
 import { useAuth } from "../context/AuthContext";
+import { useVIPLoader } from "../context/LoadingContext";
 
 // ============================================================
 // AL MADINA RESTAURANT — Customer Reviews & Safety Verification
-// - Validates submitted reviews with an automated safety & sentiment filter.
-// - If safe and non-harmful for guests, pins the review at the top
-//   as a prominent Verified Spotlight message visible to everyone.
-// - Replaces generic header with royal Pakistani dining tagline.
+// - User submits review -> 2-3 seconds VIP verifying loader runs
+// - Review is analyzed in background:
+//     * If safe: Success confirmation shown, pinned as top spotlight!
+//     * If abusive/harmful words detected: Polite removal notice shown
+// - Clean UI: Technical rules & explanation removed from public eyes.
 // ============================================================
 
 function StarRow({ rating, size = 15, interactive = false, onChange }) {
@@ -38,6 +47,8 @@ function StarRow({ rating, size = 15, interactive = false, onChange }) {
 export default function Reviews() {
   const { reviews, addReview, averageRating } = useReviews();
   const { user } = useAuth();
+  const { triggerLoader } = useVIPLoader();
+
   const [form, setForm] = useState({
     name: user?.user_metadata?.full_name || "",
     rating: 5,
@@ -45,50 +56,82 @@ export default function Reviews() {
   });
   const [spotlightReview, setSpotlightReview] = useState(null);
   const [errorMsg, setErrorMsg] = useState("");
-  const [successToast, setSuccessToast] = useState(false);
+  const [successToast, setSuccessToast] = useState("");
+  const [verifying, setVerifying] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg("");
-    setSuccessToast(false);
+    setSuccessToast("");
 
     if (!form.name.trim() || !form.comment.trim()) {
       setErrorMsg("Barah-e-karam apna naam aur review zaroor darj karein.");
       return;
     }
 
-    // Automated safety check (ensure no harm, scam, abuse, or malicious links)
+    setVerifying(true);
+
+    // Run 2.2 seconds verifying loader experience
+    await triggerLoader(
+      "Review Verification Jari Hai...",
+      "Al Madina Restaurant safety & authenticity engine aapka review check kar raha hai...",
+      2200
+    );
+
+    setVerifying(false);
+
+    // Automated internal safety check (scam, abuse, dirty language or malicious links)
     const lowerComment = form.comment.toLowerCase();
     const harmfulPatterns = [
-      "hack", "scam", "cheat", "fraud", "abuse", "gali", "bakwas", "chor",
-      "xxx", "porn", "viagra", "casino", "http://", "https://", ".com", ".ru", ".xyz"
+      "hack",
+      "scam",
+      "cheat",
+      "fraud",
+      "abuse",
+      "gali",
+      "bakwas",
+      "chor",
+      "xxx",
+      "porn",
+      "viagra",
+      "casino",
+      "http://",
+      "https://",
+      ".com",
+      ".ru",
+      ".xyz",
     ];
 
     const isHarmful = harmfulPatterns.some((pattern) => lowerComment.includes(pattern));
 
     if (isHarmful) {
-      setErrorMsg("⚠️ Review safety check: Ghair munasib ya spam alfaz paye gaye hain. Customers ke tahaffuz ke liye yeh review publish nahi ho sakta.");
+      setErrorMsg(
+        "⚠️ Notice: Aapka review system safety guidelines par poora nahi utra aur is mein ghair-munasib alfaz paye gaye hain. Yeh review website se automatic remove kar diya gaya hai."
+      );
       return;
     }
 
-    // Harmless, genuine & constructive customer review: Approved!
+    // Approved verified review
     const verifiedReview = {
       name: form.name.trim(),
       rating: form.rating,
       comment: form.comment.trim(),
       verified: true,
-      verifiedDate: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+      verifiedDate: new Date().toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      }),
     };
 
     addReview(verifiedReview);
-
-    // Set top spotlight message visible to all users
     setSpotlightReview(verifiedReview);
-    setSuccessToast(true);
+    setSuccessToast(
+      "Shukriya! Aapka review kamyabi se verify ho kar website ke top par publish ho gaya hai!"
+    );
     setForm({ name: user?.user_metadata?.full_name || "", rating: 5, comment: "" });
 
-    // Auto-dismiss success toast after 6 seconds, keeping spotlight pinned
-    setTimeout(() => setSuccessToast(false), 6000);
+    setTimeout(() => setSuccessToast(""), 8000);
   };
 
   return (
@@ -102,47 +145,57 @@ export default function Reviews() {
         href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Work+Sans:wght@400;500;600&display=swap"
       />
       <style>{`
-        .am-rev-heading { font-family: 'Amiri', serif; color: #FFFFFF; }
+        .am-rev-heading {
+          font-family: 'Amiri', serif;
+          color: #FFFFFF;
+        }
         .am-rev-card {
           background: rgba(255,255,255,0.03);
           border: 1px solid rgba(212,175,55,0.22);
-          border-radius: 14px;
-          padding: 18px;
-          transition: border-color 0.3s ease, transform 0.3s ease;
+          border-radius: 16px;
+          padding: 20px;
+          transition: transform 0.35s ease, box-shadow 0.35s ease, border-color 0.35s ease;
         }
         .am-rev-card:hover {
+          transform: translateY(-4px);
           border-color: rgba(212,175,55,0.55);
-          transform: translateY(-3px);
+          box-shadow: 0 16px 36px rgba(0,0,0,0.6), 0 0 20px rgba(212,175,55,0.12);
         }
         .am-rev-form-card {
-          background: rgba(255,255,255,0.03);
+          background: rgba(255,255,255,0.025);
           border: 1px solid rgba(212,175,55,0.3);
-          border-radius: 14px;
-          padding: 22px;
+          border-radius: 18px;
+          padding: 24px;
         }
         .am-rev-input {
           width: 100%;
           background: rgba(255,255,255,0.05);
-          border: 1px solid rgba(212,175,55,0.3);
+          border: 1px solid rgba(212,175,55,0.25);
           color: #FFFFFF;
-          font-size: 13px;
-          padding: 10px 12px;
+          font-size: 13.5px;
+          padding: 10px 14px;
           border-radius: 8px;
           outline: none;
+          transition: border-color 0.25s ease;
         }
-        .am-rev-input:focus { border-color: #D4AF37; }
-        .am-rev-input::placeholder { color: rgba(255,255,255,0.4); }
+        .am-rev-input:focus {
+          border-color: #D4AF37;
+        }
+        .am-rev-input::placeholder {
+          color: rgba(255,255,255,0.35);
+        }
         .am-rev-submit {
+          width: 100%;
           background: linear-gradient(135deg, #D4AF37 0%, #F0DFA0 100%);
           color: #0A0A0A;
           font-weight: 600;
-          font-size: 13px;
           padding: 11px;
           border-radius: 8px;
-          transition: transform 0.25s ease, box-shadow 0.25s ease;
+          font-size: 13.5px;
+          transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
-        .am-rev-submit:hover {
-          transform: translateY(-2px);
+        .am-rev-submit:hover:not(:disabled) {
+          transform: translateY(-1px);
           box-shadow: 0 8px 20px rgba(212,175,55,0.35);
         }
         .am-avatar-circle {
@@ -192,7 +245,7 @@ export default function Reviews() {
                       ✨ Top Spotlight: Verified Safe Customer Review
                     </span>
                     <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-semibold border border-emerald-500/30">
-                      ✓ Har Customer Ko Live Visible
+                      ✓ Live Spotlight On Top
                     </span>
                   </div>
                   <p className="text-sm text-white font-medium mt-1">
@@ -235,7 +288,9 @@ export default function Reviews() {
                           <ShieldCheck size={11} /> Verified Customer
                         </span>
                       </div>
-                      <span className="text-xs text-white/45">{r.date || r.verifiedDate || "Recent"}</span>
+                      <span className="text-xs text-white/45">
+                        {r.date || r.verifiedDate || "Recent"}
+                      </span>
                     </div>
                     <StarRow rating={r.rating} />
                     <p className="text-sm mt-2 leading-relaxed text-white/80">
@@ -249,15 +304,21 @@ export default function Reviews() {
 
           {/* Submit form */}
           <div className="am-rev-form-card h-fit reveal-right card-3d">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-white text-base font-bold">Apna Review Likhein</h3>
-              <span className="text-[10px] text-[#D4AF37] font-semibold border border-[#D4AF37]/30 px-2 py-0.5 rounded-full">
-                Safety Verified
-              </span>
-            </div>
-            <p className="text-xs text-white/55 mb-4">
-              Har review automated check se guzarta hai. Agar review safe aur faida-mand ho to foran top par har customer ko live nazar aata hai.
-            </p>
+            <h3 className="text-white text-base font-bold mb-3">Apna Review Likhein</h3>
+
+            {successToast && (
+              <div className="p-3 mb-3 bg-emerald-500/15 border border-emerald-500/40 rounded-xl text-emerald-300 text-xs flex items-center gap-2">
+                <CheckCircle2 size={16} className="shrink-0" />
+                <span>{successToast}</span>
+              </div>
+            )}
+
+            {errorMsg && (
+              <div className="p-3 mb-3 bg-red-500/15 border border-red-500/40 rounded-xl text-red-300 text-xs flex items-start gap-2">
+                <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                <span>{errorMsg}</span>
+              </div>
+            )}
 
             <form onSubmit={handleSubmit} className="space-y-3.5">
               <div>
@@ -278,15 +339,17 @@ export default function Reviews() {
                   rating={form.rating}
                   size={22}
                   interactive
-                  onChange={(n) => setForm({ ...form, rating: n })}
+                  onChange={(val) => setForm({ ...form, rating: val })}
                 />
               </div>
 
               <div>
-                <label className="text-[11px] text-white/70 block mb-1">Khane & Service Ka Tajruba</label>
+                <label className="text-[11px] text-white/70 block mb-1">
+                  Aapka Review & Feedback
+                </label>
                 <textarea
-                  placeholder="Chicken Biryani ka zaiqa, mutton karahi, delivery time ya dawat ka tajruba..."
-                  rows={3}
+                  rows={4}
+                  placeholder="Khana kaisa laga? Hamari service aur zaiqay ke baare mein apni raye likhein..."
                   value={form.comment}
                   onChange={(e) => setForm({ ...form, comment: e.target.value })}
                   className="am-rev-input resize-none"
@@ -294,20 +357,13 @@ export default function Reviews() {
                 />
               </div>
 
-              {errorMsg && (
-                <p className="text-xs text-red-400 flex items-center gap-1.5 bg-red-500/10 p-2.5 rounded-lg border border-red-500/20">
-                  <AlertCircle size={14} className="shrink-0" /> {errorMsg}
-                </p>
-              )}
-
-              {successToast && (
-                <p className="text-xs text-emerald-400 flex items-center gap-1.5 bg-emerald-500/10 p-2.5 rounded-lg border border-emerald-500/20">
-                  <CheckCircle2 size={14} className="shrink-0" /> Review automated check pass ho gaya aur top par live publish kar diya gaya!
-                </p>
-              )}
-
-              <button type="submit" className="am-rev-submit w-full font-bold">
-                Submit & Verify Review
+              <button
+                type="submit"
+                disabled={verifying}
+                className="am-rev-submit flex items-center justify-center gap-2"
+              >
+                {verifying && <Loader2 size={16} className="animate-spin" />}
+                {verifying ? "Checking & Verifying..." : "Review Submit Karein"}
               </button>
             </form>
           </div>

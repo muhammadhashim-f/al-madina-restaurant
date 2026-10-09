@@ -4,6 +4,7 @@ import { Truck, Store, CreditCard, Wallet, CheckCircle2, ArrowLeft, Lock, Loader
 import { useCart } from "../context/CartContext";
 import { useOrders } from "../context/OrdersContext";
 import { useAuth } from "../context/AuthContext";
+import { useVIPLoader } from "../context/LoadingContext";
 import { geocodeAddress } from "../utils/geocode";
 import { getWhatsAppOrderUrl, RESTAURANT_PHONE } from "../utils/whatsapp";
 
@@ -21,6 +22,7 @@ export default function Checkout() {
   const { items, cartTotal, clearCart } = useCart();
   const { addOrder } = useOrders();
   const { isLoggedIn, user } = useAuth();
+  const { triggerLoader } = useVIPLoader();
 
   const [fulfillment, setFulfillment] = useState("delivery"); // "delivery" | "pickup"
   const [paymentMethod, setPaymentMethod] = useState("cod"); // "cod" | "card"
@@ -53,6 +55,12 @@ export default function Checkout() {
         return;
       }
     }
+
+    await triggerLoader(
+      "Al Madina Shahi Kitchen Order Dispatch",
+      "Aapka order system mein darj ho raha hai aur Kitchen verification mukammal ho rahi hai...",
+      2500
+    );
 
     const order = addOrder({
       items,

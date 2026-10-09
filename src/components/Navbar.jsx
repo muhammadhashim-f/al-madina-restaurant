@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import { useFavorites } from "../context/FavoritesContext";
 import { useAuth } from "../context/AuthContext";
+import { useVIPLoader } from "../context/LoadingContext";
 import { Menu, X, ShoppingCart, User, ChevronDown, Search, Heart } from "lucide-react";
 
 // ============================================================
@@ -49,6 +50,31 @@ export default function Navbar() {
   const { user, isLoggedIn, signOut } = useAuth();
   const { cartCount } = useCart();
   const { favorites } = useFavorites();
+  const { triggerLoader } = useVIPLoader();
+
+  const handleNavClick = (e, link) => {
+    // When clicking any main section link like Contact, Menu, Reviews, Reservations, etc.
+    // show 2.2-second VIP transition loader
+    e.preventDefault();
+    setMobileOpen(false);
+    triggerLoader(
+      `Al Madina — ${link.label} Section`,
+      `VIP loading... ${link.label} ki taraf muntaqil kiya ja raha hai...`,
+      1800,
+      () => {
+        if (link.href.startsWith("/#")) {
+          const hash = link.href.replace("/", "");
+          navigate("/");
+          setTimeout(() => {
+            const el = document.querySelector(hash);
+            if (el) el.scrollIntoView({ behavior: "smooth" });
+          }, 80);
+        } else {
+          navigate(link.href);
+        }
+      }
+    );
+  };
 
   const displayName = user?.user_metadata?.full_name || user?.email || "";
   const initials = displayName
@@ -265,14 +291,15 @@ export default function Navbar() {
             {/* Desktop nav links */}
             <div className="hidden md:flex items-center gap-1">
               {NAV_LINKS.map((link) => (
-                <Link
+                <a
                   key={link.label}
-                  to={link.href}
-                  className="am-link px-4 py-2 text-sm font-medium am-white transition-colors rounded-md"
+                  href={link.href}
+                  onClick={(e) => handleNavClick(e, link)}
+                  className="am-link px-4 py-2 text-sm font-medium am-white transition-colors rounded-md cursor-pointer"
                 >
                   {link.label}
                   <span className="am-underline" />
-                </Link>
+                </a>
               ))}
             </div>
 
@@ -408,14 +435,14 @@ export default function Navbar() {
               />
             </form>
             {NAV_LINKS.map((link) => (
-              <Link
+              <a
                 key={link.label}
-                to={link.href}
-                onClick={() => setMobileOpen(false)}
-                className="block py-3 am-glow-text text-sm font-medium border-b border-white/5"
+                href={link.href}
+                onClick={(e) => handleNavClick(e, link)}
+                className="block py-3 am-glow-text text-sm font-medium border-b border-white/5 cursor-pointer"
               >
                 {link.label}
-              </Link>
+              </a>
             ))}
             <div className="flex items-center justify-between mt-4">
               {isLoggedIn ? (

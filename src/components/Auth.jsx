@@ -1,18 +1,44 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Mail, Lock, User, Eye, EyeOff, Loader2, X } from "lucide-react";
+import {
+  Mail,
+  Lock,
+  User,
+  Eye,
+  EyeOff,
+  Loader2,
+  X,
+  Phone,
+  ShieldCheck,
+  CheckCircle2,
+  AlertCircle,
+} from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { useVIPLoader } from "../context/LoadingContext";
 
 // ============================================================
-// AL MADINA RESTAURANT — Auth Page (Login / Signup)
-// Matches theme: black background, gold accents, white text.
-// Connected to real Supabase Auth + Instant fail-safe Google Sign-in.
+// AL MADINA RESTAURANT — High Security Auth (Login / Signup)
+// Features:
+// - Live Password Strength Meter (Weak, Medium, Strong, Bulletproof)
+// - Real-time password hints (Length 8+, Uppercase, Lowercase, Number, Symbol)
+// - Pakistani phone number support & Confirm Password verification
+// - Terms of service & Halal culinary pledge agreement
+// - VIP Loader transition
+// - Google Sign-in fail-safe
 // ============================================================
 
 export default function Auth() {
   const [mode, setMode] = useState("login"); // "login" | "signup"
   const [showPassword, setShowPassword] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    password: "",
+    confirmPassword: "",
+    agreeTerms: true,
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [infoMessage, setInfoMessage] = useState("");
@@ -20,6 +46,7 @@ export default function Auth() {
   const [customGoogleEmail, setCustomGoogleEmail] = useState("");
 
   const { signUp, signIn, signInWithGoogle, isLoggedIn } = useAuth();
+  const { triggerLoader } = useVIPLoader();
   const navigate = useNavigate();
 
   React.useEffect(() => {
@@ -27,28 +54,90 @@ export default function Auth() {
   }, [isLoggedIn, navigate]);
 
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value, type, checked } = e.target;
+    setForm((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
     if (error) setError("");
   };
+
+  // Password Security Strength Calculation
+  const getPasswordCriteria = (pass) => {
+    return {
+      length: pass.length >= 8,
+      hasUpper: /[A-Z]/.test(pass),
+      hasLower: /[a-z]/.test(pass),
+      hasNumber: /[0-9]/.test(pass),
+      hasSymbol: /[^A-Za-z0-9]/.test(pass),
+    };
+  };
+
+  const criteria = getPasswordCriteria(form.password);
+  const passedCount = Object.values(criteria).filter(Boolean).length;
+
+  const getStrengthInfo = () => {
+    if (!form.password) return { label: "", percent: 0, color: "bg-white/20", textCol: "text-white/40" };
+    if (passedCount <= 2) return { label: "Weak (Kamzor)", percent: 25, color: "bg-red-500", textCol: "text-red-400" };
+    if (passedCount === 3) return { label: "Fair (Behtar)", percent: 50, color: "bg-amber-500", textCol: "text-amber-400" };
+    if (passedCount === 4) return { label: "Strong (Mazboot)", percent: 75, color: "bg-emerald-500", textCol: "text-emerald-400" };
+    return { label: "Very Strong / Bulletproof 🛡️", percent: 100, color: "bg-[#D4AF37]", textCol: "text-[#F0DFA0]" };
+  };
+
+  const strength = getStrengthInfo();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setInfoMessage("");
+
+    if (mode === "signup") {
+      // 1. Password length & criteria check
+      if (form.password.length < 8) {
+        setError("Password kam az kam 8 characters par mushtamil hona zaroori hai.");
+        return;
+      }
+      if (passedCount < 3) {
+        setError("Aapka password kamzor hai. Kripya baray huroof (A-Z), chotay huroof (a-z), adad (0-9) ya symbols (@$!%*#?&) shamil karein.");
+        return;
+      }
+      // 2. Password matching check
+      if (form.password !== form.confirmPassword) {
+        setError("Dono passwords aapas mein match nahi kar rahe. Barah-e-karam dobara check karein.");
+        return;
+      }
+      // 3. Terms check
+      if (!form.agreeTerms) {
+        setError("Al Madina Restaurant ke Terms & Privacy Policy ko accept karna zaroori hai.");
+        return;
+      }
+    }
+
     setLoading(true);
 
     if (mode === "signup") {
-      const { data, error } = await signUp(form);
-      setLoading(false);
+      const { data, error } = await signUp({
+        name: form.name,
+        email: form.email,
+        phone: form.phone,
+        password: form.password,
+      });
 
       if (error) {
+        setLoading(false);
         setError(error.message);
         return;
       }
 
+      await triggerLoader(
+        "Khush Aamdeed! Account Ban Raha Hai",
+        "Al Madina Restaurant security & guest database update ki ja rahi hai..."
+      );
+      setLoading(false);
+
       if (data?.user && !data?.session) {
         setInfoMessage(
-          "Account created! Please check your email for a confirmation code from Al Madina Restaurant to activate your account."
+          "Account kamyabi se ban gaya! Please check your email for confirmation code to activate."
         );
         setMode("login");
         return;
@@ -56,14 +145,22 @@ export default function Auth() {
 
       navigate("/");
     } else {
-      const { error } = await signIn(form);
-      setLoading(false);
+      const { error } = await signIn({
+        email: form.email,
+        password: form.password,
+      });
 
       if (error) {
+        setLoading(false);
         setError(error.message);
         return;
       }
 
+      await triggerLoader(
+        "Shahi Mehmaan Tashreef La Rahe Hain",
+        "Al Madina Restaurant profile data verify ho raha hai..."
+      );
+      setLoading(false);
       navigate("/");
     }
   };
@@ -72,18 +169,20 @@ export default function Auth() {
     setError("");
     setLoading(true);
     const { error } = await signInWithGoogle({ email, name });
-    setLoading(false);
     if (error) {
+      setLoading(false);
       setError(error.message);
       return;
     }
+    await triggerLoader("Google Secure Login", "Al Madina Account sync ho raha hai...", 1800);
+    setLoading(false);
     setGoogleModal(false);
     navigate("/");
   };
 
   return (
     <section
-      className="w-full min-h-screen flex items-center justify-center px-4"
+      className="w-full min-h-screen flex items-center justify-center px-4 py-16"
       style={{ background: "linear-gradient(160deg, #0A0A0A 0%, #141414 60%, #0A0A0A 100%)" }}
     >
       <link
@@ -94,10 +193,12 @@ export default function Auth() {
         .am-auth-card {
           background: rgba(255,255,255,0.03);
           border: 1px solid rgba(212,175,55,0.25);
-          border-radius: 16px;
+          border-radius: 20px;
           width: 100%;
-          max-width: 420px;
-          padding: 40px 32px;
+          max-width: 460px;
+          padding: 36px 30px;
+          backdrop-filter: blur(12px);
+          box-shadow: 0 20px 50px rgba(0,0,0,0.8), 0 0 25px rgba(212,175,55,0.12);
         }
         .am-auth-heading {
           font-family: 'Amiri', serif;
@@ -108,11 +209,11 @@ export default function Auth() {
           border: 1px solid rgba(255,255,255,0.12);
           border-radius: 10px;
           overflow: hidden;
-          margin-bottom: 28px;
+          margin-bottom: 24px;
         }
         .am-tab-toggle button {
           flex: 1;
-          padding: 10px;
+          padding: 11px;
           font-size: 13px;
           font-weight: 500;
           color: rgba(255,255,255,0.6);
@@ -125,7 +226,7 @@ export default function Auth() {
         }
         .am-auth-input-wrap {
           position: relative;
-          margin-bottom: 16px;
+          margin-bottom: 14px;
         }
         .am-auth-input-wrap svg.leading {
           position: absolute;
@@ -139,14 +240,15 @@ export default function Auth() {
           background: rgba(255,255,255,0.05);
           border: 1px solid rgba(212,175,55,0.3);
           color: #FFFFFF;
-          font-size: 14px;
+          font-size: 13.5px;
           padding: 11px 14px 11px 40px;
           border-radius: 8px;
           outline: none;
-          transition: border-color 0.25s ease;
+          transition: border-color 0.25s ease, background 0.25s ease;
         }
         .am-auth-input:focus {
           border-color: #D4AF37;
+          background: rgba(255,255,255,0.08);
         }
         .am-auth-input::placeholder {
           color: rgba(255,255,255,0.4);
@@ -168,7 +270,7 @@ export default function Auth() {
           font-size: 14px;
           transition: transform 0.25s ease, box-shadow 0.25s ease;
         }
-        .am-auth-submit:hover {
+        .am-auth-submit:hover:not(:disabled) {
           transform: translateY(-2px);
           box-shadow: 0 10px 24px rgba(212,175,55,0.35);
         }
@@ -176,7 +278,7 @@ export default function Auth() {
           display: flex;
           align-items: center;
           gap: 12px;
-          margin: 22px 0;
+          margin: 20px 0;
           color: rgba(255,255,255,0.4);
           font-size: 12px;
         }
@@ -196,7 +298,7 @@ export default function Auth() {
           color: #1C1B19;
           padding: 11px;
           border-radius: 8px;
-          font-size: 14px;
+          font-size: 13.5px;
           font-weight: 500;
           transition: transform 0.2s ease;
         }
@@ -205,68 +307,110 @@ export default function Auth() {
         }
         .am-forgot-link {
           color: #D4AF37;
-          font-size: 13px;
+          font-size: 12.5px;
           text-align: right;
           display: block;
-          margin: -8px 0 16px;
+          margin: -6px 0 16px;
         }
       `}</style>
 
       <div className="am-auth-card">
-        <h1 className="am-auth-heading text-2xl font-bold text-center mb-1">Al Madina</h1>
-        <p className="text-center text-sm mb-7" style={{ color: "rgba(255,255,255,0.55)" }}>
-          {mode === "login" ? "Welcome back — sign in to continue" : "Create an account to get started"}
-        </p>
+        {/* Top Header */}
+        <div className="text-center mb-6">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-widest bg-[#D4AF37]/15 border border-[#D4AF37]/40 text-[#F0DFA0] mb-2">
+            <ShieldCheck size={13} className="text-[#D4AF37]" />
+            Al Madina Secure Portal
+          </span>
+          <h1 className="am-auth-heading text-3xl font-bold mb-1">Al Madina</h1>
+          <p className="text-sm" style={{ color: "rgba(255,255,255,0.55)" }}>
+            {mode === "login"
+              ? "Welcome back — sign in to continue"
+              : "Register for VIP orders & table bookings"}
+          </p>
+        </div>
 
         <div className="am-tab-toggle">
           <button
             type="button"
             className={mode === "login" ? "active" : ""}
-            onClick={() => { setMode("login"); setError(""); setInfoMessage(""); }}
+            onClick={() => {
+              setMode("login");
+              setError("");
+              setInfoMessage("");
+            }}
           >
             Log In
           </button>
           <button
             type="button"
             className={mode === "signup" ? "active" : ""}
-            onClick={() => { setMode("signup"); setError(""); setInfoMessage(""); }}
+            onClick={() => {
+              setMode("signup");
+              setError("");
+              setInfoMessage("");
+            }}
           >
-            Sign Up
+            Sign Up (New Account)
           </button>
         </div>
 
         {infoMessage && (
           <div
-            className="text-xs mb-4 px-3 py-2 rounded-md"
-            style={{ background: "rgba(212,175,55,0.12)", border: "1px solid rgba(212,175,55,0.4)", color: "#F0DFA0" }}
+            className="text-xs mb-4 px-3.5 py-2.5 rounded-lg flex items-center gap-2"
+            style={{
+              background: "rgba(212,175,55,0.12)",
+              border: "1px solid rgba(212,175,55,0.4)",
+              color: "#F0DFA0",
+            }}
           >
-            {infoMessage}
+            <CheckCircle2 size={16} className="text-[#D4AF37] shrink-0" />
+            <span>{infoMessage}</span>
           </div>
         )}
 
         {error && (
           <div
-            className="text-xs mb-4 px-3 py-2 rounded-md"
-            style={{ background: "rgba(232,132,106,0.12)", border: "1px solid rgba(232,132,106,0.4)", color: "#E8846A" }}
+            className="text-xs mb-4 px-3.5 py-2.5 rounded-lg flex items-start gap-2"
+            style={{
+              background: "rgba(232,132,106,0.15)",
+              border: "1px solid rgba(232,132,106,0.5)",
+              color: "#FFA085",
+            }}
           >
-            {error}
+            <AlertCircle size={16} className="text-red-400 shrink-0 mt-0.5" />
+            <span>{error}</span>
           </div>
         )}
 
         <form onSubmit={handleSubmit}>
           {mode === "signup" && (
-            <div className="am-auth-input-wrap">
-              <User size={16} className="leading" />
-              <input
-                type="text"
-                name="name"
-                value={form.name}
-                onChange={handleChange}
-                placeholder="Full name"
-                className="am-auth-input"
-                required
-              />
-            </div>
+            <>
+              <div className="am-auth-input-wrap">
+                <User size={16} className="leading" />
+                <input
+                  type="text"
+                  name="name"
+                  value={form.name}
+                  onChange={handleChange}
+                  placeholder="Full Name (Aapka Poora Naam)"
+                  className="am-auth-input"
+                  required
+                />
+              </div>
+
+              <div className="am-auth-input-wrap">
+                <Phone size={16} className="leading" />
+                <input
+                  type="tel"
+                  name="phone"
+                  value={form.phone}
+                  onChange={handleChange}
+                  placeholder="Phone Number (e.g. 0300-1234567)"
+                  className="am-auth-input"
+                  required
+                />
+              </div>
+            </>
           )}
 
           <div className="am-auth-input-wrap">
@@ -276,7 +420,7 @@ export default function Auth() {
               name="email"
               value={form.email}
               onChange={handleChange}
-              placeholder="Email address"
+              placeholder="Email address (e.g. name@example.com)"
               className="am-auth-input"
               required
             />
@@ -289,24 +433,113 @@ export default function Auth() {
               name="password"
               value={form.password}
               onChange={handleChange}
-              placeholder="Password"
+              placeholder={mode === "signup" ? "Set Password (Min 8 chars, 1 symbol)" : "Password"}
               className="am-auth-input"
               required
             />
-            <button type="button" className="am-eye-btn" onClick={() => setShowPassword(!showPassword)}>
+            <button
+              type="button"
+              className="am-eye-btn"
+              onClick={() => setShowPassword(!showPassword)}
+            >
               {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           </div>
 
-          {mode === "login" && (
-            <Link to="/forgot-password" className="am-forgot-link">Forgot password?</Link>
+          {/* Dynamic Password Strength Meter for Signup */}
+          {mode === "signup" && form.password.length > 0 && (
+            <div className="mb-4 p-3 bg-white/5 border border-white/10 rounded-xl space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-white/60 font-medium">Password Strength:</span>
+                <span className={`font-bold ${strength.textCol}`}>{strength.label}</span>
+              </div>
+
+              {/* Progress Bar */}
+              <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+                <div
+                  className={`h-full ${strength.color} transition-all duration-300`}
+                  style={{ width: `${strength.percent}%` }}
+                />
+              </div>
+
+              {/* Security Hints Checklist */}
+              <div className="grid grid-cols-2 gap-1.5 pt-1 text-[11px]">
+                <div className={`flex items-center gap-1.5 ${criteria.length ? "text-emerald-400" : "text-white/40"}`}>
+                  <span className="text-xs">{criteria.length ? "✓" : "○"}</span> 8+ Characters
+                </div>
+                <div className={`flex items-center gap-1.5 ${criteria.hasUpper ? "text-emerald-400" : "text-white/40"}`}>
+                  <span className="text-xs">{criteria.hasUpper ? "✓" : "○"}</span> Capital letter (A-Z)
+                </div>
+                <div className={`flex items-center gap-1.5 ${criteria.hasNumber ? "text-emerald-400" : "text-white/40"}`}>
+                  <span className="text-xs">{criteria.hasNumber ? "✓" : "○"}</span> At least 1 Number
+                </div>
+                <div className={`flex items-center gap-1.5 ${criteria.hasSymbol ? "text-emerald-400" : "text-white/40"}`}>
+                  <span className="text-xs">{criteria.hasSymbol ? "✓" : "○"}</span> Special symbol (@#$%)
+                </div>
+              </div>
+            </div>
           )}
 
-          <button type="submit" className="am-auth-submit flex items-center justify-center gap-2" disabled={loading}>
+          {/* Confirm Password Field for Signup */}
+          {mode === "signup" && (
+            <div className="am-auth-input-wrap">
+              <Lock size={16} className="leading" />
+              <input
+                type={showConfirmPassword ? "text" : "password"}
+                name="confirmPassword"
+                value={form.confirmPassword}
+                onChange={handleChange}
+                placeholder="Confirm Password (Password Dobara Likhye)"
+                className="am-auth-input"
+                required
+              />
+              <button
+                type="button"
+                className="am-eye-btn"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              >
+                {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          )}
+
+          {/* Terms & Conditions Checkbox */}
+          {mode === "signup" && (
+            <label className="flex items-start gap-2.5 text-xs text-white/70 mb-4 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                name="agreeTerms"
+                checked={form.agreeTerms}
+                onChange={handleChange}
+                className="mt-0.5 accent-[#D4AF37] rounded"
+              />
+              <span>
+                Main Al Madina Restaurant ki{" "}
+                <span className="text-[#D4AF37] underline">Security Policy</span> aur{" "}
+                <span className="text-[#D4AF37] underline">Halal Dining Rules</span> se ittefaq karta hoon.
+              </span>
+            </label>
+          )}
+
+          {mode === "login" && (
+            <Link to="/forgot-password" className="am-forgot-link">
+              Forgot password?
+            </Link>
+          )}
+
+          <button
+            type="submit"
+            className="am-auth-submit flex items-center justify-center gap-2"
+            disabled={loading}
+          >
             {loading && <Loader2 size={16} className="animate-spin" />}
             {loading
-              ? (mode === "login" ? "Logging in..." : "Creating account...")
-              : (mode === "login" ? "Log In" : "Create Account")}
+              ? mode === "login"
+                ? "Logging in..."
+                : "Creating secure account..."
+              : mode === "login"
+              ? "Log In"
+              : "Register Account (Hifazat Shuda)"}
           </button>
         </form>
 
@@ -322,9 +555,9 @@ export default function Auth() {
           <button
             onClick={() => setMode(mode === "login" ? "signup" : "login")}
             style={{ color: "#D4AF37" }}
-            className="font-medium"
+            className="font-medium underline ml-1"
           >
-            {mode === "login" ? "Sign up" : "Log in"}
+            {mode === "login" ? "Sign up here" : "Log in here"}
           </button>
         </p>
       </div>
@@ -360,53 +593,50 @@ export default function Auth() {
                 <div className="w-9 h-9 rounded-full bg-emerald-700 text-white font-bold flex items-center justify-center text-sm shrink-0">
                   A
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-white text-sm font-medium truncate">ah1572986@gmail.com</p>
-                  <p className="text-xs text-white/50">Al Madina Customer</p>
+                <div className="overflow-hidden">
+                  <p className="text-sm text-white font-medium truncate">ah1572986@gmail.com</p>
+                  <p className="text-xs text-white/40">Active Account</p>
                 </div>
               </button>
 
               <button
                 type="button"
-                onClick={() => handleSelectGoogleAccount("user@gmail.com", "Google User")}
+                onClick={() => handleSelectGoogleAccount("guest@almadina.pk", "Karachi Foodie")}
                 className="w-full flex items-center gap-3 p-3 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-[#D4AF37]/50 rounded-xl text-left transition-all"
               >
-                <div className="w-9 h-9 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-sm shrink-0">
-                  G
+                <div className="w-9 h-9 rounded-full bg-[#D4AF37] text-black font-bold flex items-center justify-center text-sm shrink-0">
+                  K
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-white text-sm font-medium truncate">user@gmail.com</p>
-                  <p className="text-xs text-white/50">Personal Account</p>
+                <div className="overflow-hidden">
+                  <p className="text-sm text-white font-medium truncate">guest@almadina.pk</p>
+                  <p className="text-xs text-white/40">VIP Guest Account</p>
                 </div>
               </button>
             </div>
 
             {/* Custom Google Email input */}
-            <div className="pt-3 border-t border-white/10">
-              <p className="text-xs text-white/60 mb-2">Or enter another Gmail:</p>
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (customGoogleEmail) {
-                    handleSelectGoogleAccount(customGoogleEmail, customGoogleEmail.split("@")[0]);
-                  }
-                }}
-                className="flex gap-2"
-              >
+            <div className="border-t border-white/10 pt-4">
+              <p className="text-xs text-white/60 mb-2">Or enter any Gmail address:</p>
+              <div className="flex gap-2">
                 <input
                   type="email"
-                  placeholder="yourname@gmail.com"
                   value={customGoogleEmail}
                   onChange={(e) => setCustomGoogleEmail(e.target.value)}
-                  className="flex-1 bg-white/5 border border-white/20 rounded-lg px-3 py-1.5 text-xs text-white outline-none focus:border-[#D4AF37]"
+                  placeholder="your.email@gmail.com"
+                  className="flex-1 bg-white/5 border border-white/15 focus:border-[#D4AF37] rounded-lg px-3 py-2 text-xs text-white outline-none"
                 />
                 <button
-                  type="submit"
-                  className="bg-[#D4AF37] hover:bg-[#F0DFA0] text-black text-xs font-bold px-3 py-1.5 rounded-lg transition-all"
+                  type="button"
+                  onClick={() => {
+                    if (customGoogleEmail.trim()) {
+                      handleSelectGoogleAccount(customGoogleEmail.trim(), customGoogleEmail.split("@")[0]);
+                    }
+                  }}
+                  className="px-3 py-2 bg-[#D4AF37] text-black text-xs font-semibold rounded-lg hover:bg-[#F0DFA0] transition-colors"
                 >
                   Continue
                 </button>
-              </form>
+              </div>
             </div>
           </div>
         </div>
@@ -417,11 +647,23 @@ export default function Auth() {
 
 function GoogleIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 48 48">
-      <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.6-6 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.2 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z"/>
-      <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.9 18.9 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.2 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/>
-      <path fill="#4CAF50" d="M24 44c5.5 0 10.4-2.1 14.1-5.6l-6.5-5.5C29.6 34.5 27 35 24 35c-5.3 0-9.7-3.4-11.3-8.1l-6.5 5C9.6 39.6 16.3 44 24 44z"/>
-      <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.2 4.3-4.1 5.9l6.5 5.5C41.5 36 44 30.5 44 24c0-1.3-.1-2.7-.4-3.5z"/>
+    <svg width="18" height="18" viewBox="0 0 48 48" className="shrink-0">
+      <path
+        fill="#FFC107"
+        d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"
+      />
+      <path
+        fill="#FF3D00"
+        d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"
+      />
+      <path
+        fill="#4CAF50"
+        d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"
+      />
+      <path
+        fill="#1976D2"
+        d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"
+      />
     </svg>
   );
 }
