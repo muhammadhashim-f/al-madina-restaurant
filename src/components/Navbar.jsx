@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import { useFavorites } from "../context/FavoritesContext";
 import { useAuth } from "../context/AuthContext";
@@ -54,12 +54,12 @@ export default function Navbar() {
 
   const handleNavClick = (e, link) => {
     // When clicking any main section link like Contact, Menu, Reviews, Reservations, etc.
-    // show 2.2-second VIP transition loader
+    // show VIP transition loader
     e.preventDefault();
     setMobileOpen(false);
     triggerLoader(
-      `Al Madina — ${link.label} Section`,
-      `VIP loading... ${link.label} ki taraf muntaqil kiya ja raha hai...`,
+      `Al Madina — ${link.label}`,
+      `VIP hospitality loading... ${link.label} ki taraf muntaqil kiya ja raha hai...`,
       1800,
       () => {
         if (link.href.startsWith("/#")) {
@@ -74,6 +74,12 @@ export default function Navbar() {
         }
       }
     );
+  };
+
+  const handleActionNav = (e, path, title, subtitle, duration = 1800) => {
+    e.preventDefault();
+    setMobileOpen(false);
+    triggerLoader(title, subtitle, duration, () => navigate(path));
   };
 
   const displayName = user?.user_metadata?.full_name || user?.email || "";
@@ -328,10 +334,11 @@ export default function Navbar() {
               </form>
 
               {/* Favorites */}
-              <Link
-                to="/favorites"
+              <a
+                href="/favorites"
+                onClick={(e) => handleActionNav(e, "/favorites", "💖 VIP Favorites", "Aapki pasandeeda dishes load ho rahi hain...", 1600)}
                 aria-label="View favorites"
-                className="am-icon-btn relative p-2 rounded-full"
+                className="am-icon-btn relative p-2 rounded-full cursor-pointer"
               >
                 <Heart size={19} className="am-white" />
                 {favorites.length > 0 && (
@@ -339,14 +346,15 @@ export default function Navbar() {
                     {favorites.length}
                   </span>
                 )}
-              </Link>
+              </a>
 
               {/* Cart */}
-              <Link
+              <a
                 id="am-navbar-cart-btn"
-                to="/cart"
+                href="/cart"
+                onClick={(e) => handleActionNav(e, "/cart", "🛒 Shahi Dastarkhwan Cart", "Aapke muntakhib items ka khulasa load ho raha hai...", 1600)}
                 aria-label="View cart"
-                className="am-icon-btn relative p-2 rounded-full"
+                className="am-icon-btn relative p-2 rounded-full cursor-pointer"
               >
                 <ShoppingCart size={20} className="am-white" />
                 {cartCount > 0 && (
@@ -354,7 +362,7 @@ export default function Navbar() {
                     {cartCount}
                   </span>
                 )}
-              </Link>
+              </a>
 
               {/* Auth / Profile */}
               {isLoggedIn ? (
@@ -381,27 +389,32 @@ export default function Navbar() {
                   </button>
                   {profileOpen && (
                     <div className="am-mobile-panel absolute right-0 mt-2 w-48 bg-[#181818] border border-white/10 rounded-lg shadow-lg py-2 text-sm">
-                      <Link to="/profile" onClick={() => setProfileOpen(false)} className="block px-4 py-2 text-white hover:bg-white/10">My Profile</Link>
-                      <Link to="/orders" onClick={() => setProfileOpen(false)} className="block px-4 py-2 text-white hover:bg-white/10">Order History</Link>
-                      <Link to="/reservations" onClick={() => setProfileOpen(false)} className="block px-4 py-2 text-white hover:bg-white/10">Reservations</Link>
+                      <a href="/profile" onClick={(e) => handleActionNav(e, "/profile", "👤 Al Madina Profile", "Aapka personal shahi profile load ho raha hai...", 1500)} className="block px-4 py-2 text-white hover:bg-white/10">My Profile</a>
+                      <a href="/orders" onClick={(e) => handleActionNav(e, "/orders", "📦 Shahi Order History", "Aapke pichle orders ki tafseelat...", 1600)} className="block px-4 py-2 text-white hover:bg-white/10">Order History</a>
+                      <a href="/reservations" onClick={(e) => handleActionNav(e, "/reservations", "🍽️ Table Reservations", "VIP family seating status...", 1600)} className="block px-4 py-2 text-white hover:bg-white/10">Reservations</a>
                       <div className="my-1 border-t border-white/10" />
                       <button onClick={handleLogout} className="w-full text-left block px-4 py-2 text-[#E8846A] hover:bg-white/10">Log out</button>
                     </div>
                   )}
                 </div>
               ) : (
-                <Link to="/login" className="am-icon-btn flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium am-white rounded-md">
+                <a
+                  href="/login"
+                  onClick={(e) => handleActionNav(e, "/login", "🔐 Al Madina VIP Security Portal", "Mehfooz login screen khul rahi hai...", 1800)}
+                  className="am-icon-btn flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium am-white rounded-md cursor-pointer"
+                >
                   <User size={17} />
                   Login
-                </Link>
+                </a>
               )}
 
-              <Link
-                to="/reservations"
-                className="am-cta ml-1 px-5 py-2 text-[#0A0A0A] text-sm font-semibold rounded-md"
+              <a
+                href="/reservations"
+                onClick={(e) => handleActionNav(e, "/reservations", "👑 Shahi Dawat Reservations", "VIP table booking hall load ho raha hai...", 1800)}
+                className="am-cta ml-1 px-5 py-2 text-[#0A0A0A] text-sm font-semibold rounded-md cursor-pointer"
               >
                 Reserve a table
-              </Link>
+              </a>
             </div>
 
             {/* Mobile menu button */}
@@ -453,35 +466,49 @@ export default function Navbar() {
                   <User size={17} /> Log out
                 </button>
               ) : (
-                <Link to="/login" onClick={() => setMobileOpen(false)} className="flex items-center gap-1.5 text-sm am-white">
+                <a
+                  href="/login"
+                  onClick={(e) => handleActionNav(e, "/login", "🔐 Al Madina VIP Security Portal", "Mehfooz login screen khul rahi hai...", 1800)}
+                  className="flex items-center gap-1.5 text-sm am-white cursor-pointer"
+                >
                   <User size={17} /> Login
-                </Link>
+                </a>
               )}
               <div className="flex items-center gap-2">
-                <Link to="/favorites" onClick={() => setMobileOpen(false)} className="relative p-2">
+                <a
+                  href="/favorites"
+                  onClick={(e) => handleActionNav(e, "/favorites", "💖 VIP Favorites", "Aapki pasandeeda dishes load ho rahi hain...", 1600)}
+                  className="relative p-2 cursor-pointer"
+                >
                   <Heart size={20} className="am-white" />
                   {favorites.length > 0 && (
                     <span className="am-cart-badge absolute -top-0.5 -right-0.5 bg-[#96283A] text-[#F5E9C8] text-[10px] font-semibold w-4 h-4 rounded-full flex items-center justify-center">
                       {favorites.length}
                     </span>
                   )}
-                </Link>
-                <Link id="am-navbar-cart-btn-mobile" to="/cart" onClick={() => setMobileOpen(false)} className="relative p-2">
+                </a>
+                <a
+                  id="am-navbar-cart-btn-mobile"
+                  href="/cart"
+                  onClick={(e) => handleActionNav(e, "/cart", "🛒 Shahi Dastarkhwan Cart", "Aapke muntakhib items ka khulasa load ho raha hai...", 1600)}
+                  className="relative p-2 cursor-pointer"
+                >
                   <ShoppingCart size={20} className="am-white" />
                   {cartCount > 0 && (
                     <span className="am-cart-badge absolute -top-0.5 -right-0.5 bg-[#96283A] text-[#F5E9C8] text-[10px] font-semibold w-4 h-4 rounded-full flex items-center justify-center">
                       {cartCount}
                     </span>
                   )}
-                </Link>
+                </a>
               </div>
             </div>
-            <Link
-              to="/reservations"
-              className="am-cta block text-center mt-4 px-5 py-2.5 text-[#0A0A0A] text-sm font-semibold rounded-md"
+            <a
+              href="/reservations"
+              onClick={(e) => handleActionNav(e, "/reservations", "👑 Shahi Dawat Reservations", "VIP table booking hall load ho raha hai...", 1800)}
+              className="am-cta block text-center mt-4 px-5 py-2.5 text-[#0A0A0A] text-sm font-semibold rounded-md cursor-pointer"
             >
               Reserve a table
-            </Link>
+            </a>
           </div>
         )}
       </nav>

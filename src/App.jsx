@@ -27,6 +27,7 @@ import ForgotPassword from './components/ForgotPassword';
 import Tracking from './components/Tracking';
 import Chatbot from './components/Chatbot';
 import NetworkSpeedLoader from './components/NetworkSpeedLoader';
+import ScrollProgressBar from './components/ScrollProgressBar';
 import AdminLogin from './components/AdminLogin';
 import AdminDashboard from './components/AdminDashboard';
 
@@ -119,6 +120,7 @@ function App() {
           <FavoritesProvider>
             <ReviewsProvider>
               <BrowserRouter>
+                <ScrollProgressBar />
                 <Navbar />
                 <ScrollToHash />
                 <ScrollWatcher />

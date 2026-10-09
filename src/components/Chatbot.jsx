@@ -13,42 +13,30 @@ import {
   Archive,
   Menu as MenuIcon,
   Phone,
-  Mail,
   Receipt,
   Star,
   CheckCircle2,
   CornerDownRight,
+  Key,
+  Settings,
+  Sparkles,
 } from "lucide-react";
 import { useCart } from "../context/CartContext";
 import { useOrders } from "../context/OrdersContext";
+import { useVIPLoader } from "../context/LoadingContext";
 import { RESTAURANT_PHONE } from "../utils/whatsapp";
 
 // ============================================================
 // AL MADINA RESTAURANT — ChatGPT-Style Intelligent Host & Chatbot
 // Features:
-// 1. Multi-chat history with Sidebar:
-//    - New Chat (+)
-//    - Rename Chat title
-//    - Archive Chat
-//    - Delete Chat
-//    - Stored in localStorage ("am_chat_sessions")
-// 2. Typing dots & Pen-style Typewriter streaming effect for big answers.
-// 3. Bill & Nutritional Breakdown Generator:
-//    - Itemized price list, subtotal, delivery Rs 150, grand total
-//    - Step-by-step cooking heritage & health benefits
-// 4. Auto-ordering from conversation:
-//    - Detects address, phone, requested items & auto-places real order into system!
-// 5. Smart Typo & Spelling Mistake Tolerance:
-//    - Understands "bryani", "krhai", "kebabz", "whatapp", "addres", etc.
-// 6. Language Mirroring & Continuity:
-//    - Replies in the exact language asked (Urdu, English, Roman Urdu, Sindhi)
-//    - Switches and maintains preferred language.
-// 7. Contextual action cards:
-//    - Quick "Add to Cart"
-//    - "Write a Review" prompt when customer praises food
-//    - Direct WhatsApp & Email support buttons
-//    - Follow-up topic suggestion chips at the bottom of long responses
-// 8. 4-Way Scroll controls & Live character counter in message box.
+// 1. Multi-chat history with Sidebar (New, Rename, Archive, Delete).
+// 2. Typing dots & Pen-style Typewriter streaming effect.
+// 3. Robust Culinary Intelligence Engine:
+//    - Handles EVERY query (prices, dishes, recipes, benefits, bills, tracking, reservations).
+//    - Typo-tolerance: understands "Button" -> "Mutton", "Bryani", "Krhai", "Bil", etc.
+//    - Does NOT force Chicken Biryani on unrelated questions.
+// 4. Clean Top & Bottom scroll controls (Left/Right removed per request).
+// 5. Optional Gemini API Engine settings with step-by-step instructions.
 // ============================================================
 
 const MENU_RECOMMENDATIONS = {
@@ -68,7 +56,16 @@ const MENU_RECOMMENDATIONS = {
     image: "/Images/menu/Mutton Karahi.jpg",
     desc: "Desi ghee & mitti ki handi mein dum diya gaya taaza desi bakray ka gosht.",
     benefits: "High zinc & iron for vitality, organic pure desi ghee fats, no artificial additives.",
-    recipe: "Wok-fried on high flame with ripe tomatoes, julienne ginger, green chilies and freshly crushed black pepper.",
+    recipe: "Wok-fried on high flame with ripe tomatoes, julienne ginger, green chilies and freshly crushed black pepper in clay handi.",
+  },
+  muttonFeast: {
+    id: 102,
+    name: "VIP Royal Handi Mutton Feast",
+    price: 2200,
+    image: "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?q=80&w=600&auto=format&fit=crop",
+    desc: "1 KG Mutton Karahi + 4 Rogheni Naan + Salad & Raita + 2 chilled Kashmiri Chai.",
+    benefits: "Full family royal nourishment with pure desi ghee and tender Mandi bakra.",
+    recipe: "Slow-cooked in clay handi over tamarind coals with whole spices, served with steaming tandoori naans.",
   },
   kebab: {
     id: 1,
@@ -129,20 +126,26 @@ const MENU_RECOMMENDATIONS = {
 const INITIAL_MESSAGE = {
   id: "msg_init",
   from: "bot",
-  text: "Assalam-o-Alaikum! Main Al Madina Restaurant ka AI Shahi Host hoon. Khana order karna ho, kisi dish ki recipe ya faiday jan-nay hon, mukammal bill banwana ho ya delivery track karni ho — main aapki khidmat mein hazir hoon! 👑🍽️",
+  text: "Assalam-o-Alaikum! Main Al Madina Restaurant Karachi ka AI Shahi Host hoon. Khana order karna ho, kisi dish ki recipe ya faiday jan-nay hon, mukammal bill banwana ho ya delivery track karni ho — main aapki khidmat mein hazir hoon! 👑🍽️",
   suggestedQuestions: [
-    "🍛 Chicken Biryani ka rate aur recipe?",
+    "🍖 Mutton Karahi ka rate aur recipe?",
+    "🍛 Chicken Biryani ki price aur faiday?",
     "🧾 Mera bill bana do (2x Biryani + 1x Karahi)",
-    "🛵 Live delivery kahan pohnchi?",
-    "📍 Karachi branch kahan hai?",
+    "📍 Restaurant timings aur address?",
   ],
 };
 
-const STORAGE_CHATS_KEY = "am_chat_sessions_v2";
+const STORAGE_CHATS_KEY = "am_chat_sessions_v3";
+const STORAGE_GEMINI_KEY = "am_user_gemini_api_key";
 
 export default function Chatbot() {
   const [open, setOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [apiKeyModalOpen, setApiKeyModalOpen] = useState(false);
+  const [userApiKey, setUserApiKey] = useState(() => localStorage.getItem(STORAGE_GEMINI_KEY) || "");
+  const [apiKeyInput, setApiKeyInput] = useState(() => localStorage.getItem(STORAGE_GEMINI_KEY) || "");
+  const [apiSaveNotice, setApiSaveNotice] = useState("");
+
   const [sessions, setSessions] = useState(() => {
     try {
       const saved = localStorage.getItem(STORAGE_CHATS_KEY);
@@ -170,6 +173,7 @@ export default function Chatbot() {
   const typewriterTimerRef = useRef(null);
   const { addToCart } = useCart();
   const { addOrder } = useOrders();
+  const { triggerLoader } = useVIPLoader();
 
   // Save sessions to localStorage
   useEffect(() => {
@@ -191,6 +195,16 @@ export default function Chatbot() {
     }
   }, [messages, isTyping, typewriterText, open]);
 
+  // Open chatbot with VIP Loader transition
+  const handleOpenChatbot = () => {
+    triggerLoader(
+      "👑 Al Madina AI Shahi Host",
+      "AI Assistant se rabta qaim ho raha hai...",
+      1200,
+      () => setOpen(true)
+    );
+  };
+
   // Handle Pen-style Typewriter animation for long answers
   const streamBotMessage = (fullResponse, newMessages) => {
     if (typewriterTimerRef.current) clearInterval(typewriterTimerRef.current);
@@ -200,13 +214,11 @@ export default function Chatbot() {
     setTypewriterText("");
     setIsTyping(false);
 
-    // Fast pen-write effect (12ms per character for smooth feel)
     typewriterTimerRef.current = setInterval(() => {
       idx += 3;
       if (idx >= fullText.length) {
         clearInterval(typewriterTimerRef.current);
         setTypewriterText("");
-        // Commit final message into session
         setSessions((prev) =>
           prev.map((s) => {
             if (s.id === currentChatId) {
@@ -238,22 +250,30 @@ export default function Chatbot() {
   };
 
   const handleAddToCart = (product) => {
-    addToCart({
-      id: product.id,
-      name: product.name,
-      price: product.price,
-      image: product.image,
-    });
-    setAddedItem(product.id);
-    setTimeout(() => setAddedItem(null), 2500);
+    triggerLoader(
+      "🛒 Cart Mein Shamil Kiya Gaya",
+      `"${product.name}" shahi dastarkhwan cart mein darj ho gaya...`,
+      1100,
+      () => {
+        addToCart({
+          id: product.id,
+          name: product.name,
+          price: product.price,
+          image: product.image,
+        });
+        setAddedItem(product.id);
+        setTimeout(() => setAddedItem(null), 2500);
+      }
+    );
   };
 
   // Typo normalizer
   const normalizeInput = (raw) => {
     let s = raw.toLowerCase().trim();
-    // Common typo fixes
+    // Common typo fixes for Mutton (User explicitly demonstrated "Button" typo)
+    s = s.replace(/\b(button|buttn|butten|muton|matan|muttn|maton|batan|bton)\b/g, "mutton");
     s = s.replace(/bryani|baryani|beryani|biriyani/g, "biryani");
-    s = s.replace(/krhai|karahi|krahi|karhi/g, "karahi");
+    s = s.replace(/krhai|krahi|karhi|kadai|kadhai/g, "karahi");
     s = s.replace(/kebabz|kabab|kabaabs|tikka|kababs/g, "kebab");
     s = s.replace(/samosay|samose|smosa|samosas/g, "samosa");
     s = s.replace(/daal|makhni|dall/g, "makhani");
@@ -261,15 +281,16 @@ export default function Chatbot() {
     s = s.replace(/kashmiri chai|pink tea|chai/g, "chai");
     s = s.replace(/whatapp|whatsap|whtsapp|watsapp/g, "whatsapp");
     s = s.replace(/adrs|adrees|adress|locashun|loction/g, "location");
-    s = s.replace(/bil|total|hisab|keemat|qemat|rate/g, "bill");
-    s = s.replace(/ordr|ordar|bok/g, "order");
+    s = s.replace(/\b(bil|total|hisab)\b/g, "bill");
+    s = s.replace(/\b(keemat|qemat|qimat|kimat|price|rates|daam|cost)\b/g, "price");
+    s = s.replace(/\b(ordr|ordar|bok)\b/g, "order");
     return s;
   };
 
   // Detect Language
   const detectLanguage = (text) => {
     if (/[\u0600-\u06FF]/.test(text)) return "urdu_script";
-    const englishWords = ["what", "how", "price", "where", "is", "the", "please", "recipe", "benefits"];
+    const englishWords = ["what", "how", "price", "where", "is", "the", "please", "recipe", "benefits", "can", "bill"];
     const hasEnglish = englishWords.some((w) => text.toLowerCase().includes(w));
     if (hasEnglish && !text.includes("hai") && !text.includes("kya") && !text.includes("bhai")) {
       return "english";
@@ -277,12 +298,97 @@ export default function Chatbot() {
     return "roman_urdu";
   };
 
-  const processResponse = (userText) => {
+  // Save User API Key
+  const handleSaveApiKey = () => {
+    const key = apiKeyInput.trim();
+    setUserApiKey(key);
+    localStorage.setItem(STORAGE_GEMINI_KEY, key);
+    setApiSaveNotice("API Key mehfooz ho gayi! Ab AI Shahi Host live mode par hai.");
+    setTimeout(() => {
+      setApiSaveNotice("");
+      setApiKeyModalOpen(false);
+    }, 1800);
+  };
+
+  // Optional External Gemini API Call
+  const callExternalGemini = async (prompt) => {
+    if (!userApiKey) return null;
+    try {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(userApiKey)}`;
+      const sysInstruction = `You are the royal culinary AI Host of Al Madina Restaurant in Karachi, Pakistan.
+Location: 25, 2 1/2 Korangi, Sector 33-B / 36-B, Korangi, Karachi.
+Phone/WhatsApp: 0300-1234567. Timings: 12:00 PM to 12:00 AM.
+Dishes & Prices:
+- Desi Mitti Handi Mutton Karahi (1 KG): Rs 1,450
+- VIP Royal Handi Mutton Feast Platter: Rs 2,200
+- Chicken Biryani (Dum Pukht): Rs 680
+- Mutton Biryani: Rs 950
+- Charcoal Seekh Kebab (4 pcs): Rs 650
+- Kashmiri Pink Chai: Rs 200
+- Vegetable Samosa (Plate): Rs 200
+- Dal Makhani (Handi): Rs 600
+- Shahi Gulab Jamun (2 pcs): Rs 300
+Home delivery fee across Karachi: Rs 150.
+Always respond warmly in the customer's language (Roman Urdu or English or Urdu script).
+If customer types typos like 'button' meaning 'mutton', understand gracefully.
+If user asks about non-food topics, politely decline and bring them back to Al Madina Restaurant.`;
+
+      const body = {
+        contents: [
+          { role: "user", parts: [{ text: `${sysInstruction}\n\nCustomer Message: ${prompt}` }] }
+        ]
+      };
+
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) return null;
+      const data = await res.json();
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      return text ? text.trim() : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const processResponse = async (userText) => {
     const raw = userText.trim();
     const clean = normalizeInput(raw);
     const lang = detectLanguage(raw);
 
-    // 1. Off-topic check (Politics, coding, homework, cricket, movies)
+    // Try user's custom Gemini API key first if configured
+    if (userApiKey) {
+      const liveAiText = await callExternalGemini(raw);
+      if (liveAiText) {
+        // Check if response mentions mutton or biryani to attach product
+        let matchedProduct = null;
+        if (clean.includes("mutton") || clean.includes("karahi") || raw.toLowerCase().includes("button")) {
+          matchedProduct = MENU_RECOMMENDATIONS.karahi;
+        } else if (clean.includes("biryani")) {
+          matchedProduct = MENU_RECOMMENDATIONS.biryani;
+        } else if (clean.includes("kebab")) {
+          matchedProduct = MENU_RECOMMENDATIONS.kebab;
+        } else if (clean.includes("chai")) {
+          matchedProduct = MENU_RECOMMENDATIONS.chai;
+        }
+
+        return {
+          text: liveAiText,
+          product: matchedProduct,
+          suggestedQuestions: [
+            "🍖 Mutton Karahi ka rate kya hai?",
+            "🍛 Biryani order karni hai",
+            "🧾 Mera bill banao",
+            "📍 Location aur delivery time?"
+          ],
+        };
+      }
+    }
+
+    // 1. Off-topic check (Politics, coding, homework, cricket, movies, etc.)
     const offTopicKeywords = [
       "weather", "mausam", "barish", "politics", "siasat", "imran", "nawaz", "shahbaz",
       "cricket", "babar", "match", "psl", "ipl", "football", "world cup",
@@ -296,19 +402,41 @@ export default function Chatbot() {
     if (offTopicKeywords.some((k) => clean.includes(k))) {
       if (lang === "english") {
         return {
-          text: "Dear guest, I am solely dedicated to Al Madina Restaurant (Karachi), our authentic dishes, recipes, bills and doorstep deliveries. I am unable to discuss unrelated matters! If you'd like our renowned Chicken Biryani, Handi Mutton Karahi, or BBQ Seekh Kebabs, let me know and I will prepare your order immediately! 🍽️✨",
-          product: MENU_RECOMMENDATIONS.biryani,
-          suggestedQuestions: ["Show me today's VIP Deals", "What are the restaurant timings?", "Calculate bill for 2 Karahi"],
+          text: "Dear guest, I am solely dedicated to Al Madina Restaurant (Karachi), our authentic dishes, recipes, bills, and deliveries. I am unable to discuss unrelated subjects! If you would like our renowned Desi Mutton Karahi, Chicken Biryani, or BBQ Seekh Kebabs, please let me know and I will assist you right away! 🍽️✨",
+          product: null,
+          suggestedQuestions: ["Show today's VIP Deals", "What are the restaurant timings?", "Calculate bill for 2 Karahi"],
         };
       }
       return {
-        text: "Bhai / Sister, main sirf Al Madina Restaurant ke zaiqon, khano, menu aur delivery orders ke bare mein baat kar sakta hoon. Main doosri baton ya topics par baat nahi kar sakta! Agar aap hamari mashhoor Chicken Biryani, Mutton Karahi, Charcoal Seekh Kebab ya Family Feast Platter order karna chahte hain to mujhe batayein, main abhi aapki cart mein add karwa deta hoon! 🍽️✨",
-        product: MENU_RECOMMENDATIONS.biryani,
-        suggestedQuestions: ["🔥 Special VIP Deals dekhayein", "⏰ Restaurant khulne ka time?", "🍛 Biryani ka rate aur detail?"],
+        text: "Bhai / Sister, main sirf Al Madina Restaurant ke zaiqon, khano, menu aur delivery orders ke bare mein baat kar sakta hoon. Main doosri baton ya topics par baat nahi kar sakta! Agar aap hamari mashhoor Mutton Karahi, Dum Pukht Chicken Biryani, Charcoal Seekh Kebab ya Family Feast Platter order karna chahte hain to mujhe batayein, main abhi aapki cart mein add karwa deta hoon! 🍽️✨",
+        product: null,
+        suggestedQuestions: ["🔥 Special VIP Deals dekhayein", "⏰ Restaurant khulne ka time?", "🍖 Mutton Karahi ki price aur detail?"],
       };
     }
 
-    // 2. Praise / Feedback detection -> Offer Review Form
+    // 2. MUTTON INQUIRY & TYPO TOLERANCE ("Button" -> "Mutton")
+    const isMuttonInquiry =
+      clean.includes("mutton") ||
+      clean.includes("bakra") ||
+      raw.toLowerCase().includes("button") ||
+      raw.toLowerCase().includes("buttn") ||
+      raw.toLowerCase().includes("batan");
+
+    if (isMuttonInquiry) {
+      const item = MENU_RECOMMENDATIONS.karahi;
+      return {
+        text: `Bhai, aapka matlab 'Mutton' (Bakray ke gosht ki dishes) tha! Al Madina Restaurant Karachi mein hamari mashhoor Mutton dishes aur latest VIP rates yeh hain:\n\n🍖 **1. Desi Mitti Handi Mutton Karahi (1 KG):** Rs 1,450\n(Taaza zabiha halaal bakray ka gosht, khalis desi ghee, taaza tamatar, roasted zeera tadka aur pissa hua shahi garam masala)\n\n👑 **2. VIP Royal Handi Mutton Feast Platter:** Rs 2,200\n(1 KG Mutton Karahi + 4x Rogheni Naan + Fresh Salad & Raita + 2 chilled Kashmiri Pink Chai)\n\n🍛 **3. Shahi Mutton Dum Biryani:** Rs 950\n(Zafrani sela basmati chawal aur naram chaamp ka gosht)\n\n🔥 **4. BBQ Mutton Seekh Kebabs (4 Pcs):** Rs 850\n(Koylay par sekha hua rasdar mutton seekh kebab)\n\n✨ **Sehat Bakhsh Faiday:**\nKhalis desi ghee aur Mandi bakray ka taaza gosht body vitality, natural iron, zinc aur high-quality protein ka behtareen zariya hai.\n\nKya aap Desi Mitti Handi Mutton Karahi (Rs 1,450) apni cart mein add karna chahenge?`,
+        product: item,
+        suggestedQuestions: [
+          "🛒 Add Mutton Karahi (Rs 1450)",
+          "👑 VIP Mutton Feast Platter (Rs 2200)",
+          "Chicken Biryani ka rate kya hai?",
+          "🛵 Delivery charges kitne hain?",
+        ],
+      };
+    }
+
+    // 3. Praise / Feedback detection -> Offer Review Form
     if (
       clean.includes("boht acha") ||
       clean.includes("zabardast") ||
@@ -322,22 +450,24 @@ export default function Chatbot() {
       return {
         text: "SubhanAllah! Boht boht shukriya aapki tareef ka! Al Madina Restaurant ke Shahi Bawarchi hamesha taaza aur laziz khana tayyar karte hain. Kya aap apna yeh keemti review hamari website par publish karna chahenge taakay har customer dekh sakay?",
         reviewPrompt: true,
+        product: null,
         suggestedQuestions: ["Reviews section mein review likhein", "Aur kya special khana hai?", "WhatsApp owner se rabta"],
       };
     }
 
-    // 3. Direct Contact, Owner, WhatsApp or Email request
-    if (clean.includes("whatsapp") || clean.includes("email") || clean.includes("phone") || clean.includes("rabta") || clean.includes("contact")) {
+    // 4. Direct Contact, Owner, WhatsApp or Email request
+    if (clean.includes("whatsapp") || clean.includes("email") || clean.includes("phone") || clean.includes("rabta") || clean.includes("contact") || clean.includes("number")) {
       return {
-        text: `Al Madina Restaurant Karachi se rabta karne ki mukammal tafseelat:\n\n📱 Owner WhatsApp: ${RESTAURANT_PHONE}\n📧 Official Email: contact@almadinarestaurant.pk\n📍 Karachi Branch: 25, 2 1/2 Korangi, Sector 33-B / 36-B, Korangi, Karachi.\n\nAap direct WhatsApp par baat kar sakte hain ya email bhej sakte hain:`,
+        text: `Al Madina Restaurant Karachi se rabta karne ki mukammal tafseelat:\n\n📱 Owner WhatsApp & Call: ${RESTAURANT_PHONE}\n📧 Official Email: contact@almadinarestaurant.pk\n📍 Karachi Branch: 25, 2 1/2 Korangi, Sector 33-B / 36-B, Korangi, Karachi.\n\nAap direct WhatsApp par baat kar sakte hain ya email bhej sakte hain:`,
         whatsappSupport: true,
-        suggestedQuestions: ["📍 Google Map direction kahan hai?", "⏰ Delivery charges kitne hain?", "🍛 Menu dikhayein"],
+        product: null,
+        suggestedQuestions: ["📍 Google Map direction kahan hai?", "⏰ Delivery charges kitne hain?", "Menu dikhayein"],
       };
     }
 
-    // 4. Auto-Order Generation when customer gives items + address + phone
-    const hasOrderIntent = clean.includes("order") || clean.includes("mangwa") || clean.includes("chahiye");
-    const hasAddress = clean.includes("location") || clean.includes("address") || clean.includes("korangi") || clean.includes("karachi") || clean.includes("house") || clean.includes("flat") || clean.includes("gali");
+    // 5. Auto-Order Generation when customer gives items + address
+    const hasOrderIntent = clean.includes("order") || clean.includes("mangwa") || clean.includes("chahiye") || clean.includes("bhej do");
+    const hasAddress = clean.includes("location") || clean.includes("address") || clean.includes("korangi") || clean.includes("karachi") || clean.includes("house") || clean.includes("flat") || clean.includes("gali") || clean.includes("road");
     const extractedPhoneMatch = raw.match(/\b03\d{2}[- ]?\d{7}\b/);
     const guestPhone = extractedPhoneMatch ? extractedPhoneMatch[0] : "0300-1234567";
 
@@ -363,18 +493,19 @@ export default function Chatbot() {
       });
 
       return {
-        text: `Mubarak ho! Aapka order auto-confirm kar liya gaya hai!\n\n📋 Order ID: #${autoOrder.id}\n🍛 Items: 2x Chicken Biryani\n🛵 Home Delivery: Karachi Address confirmed\n💵 Total Bill: Rs ${autoOrder.total} (Cash on Delivery)\n\nKitchen mein tayyari shuru ho chuki hai aur live rider rider map par bike chalti hui nazar aayegi!`,
+        text: `Mubarak ho! Aapka order auto-confirm kar liya gaya hai!\n\n📋 Order ID: #${autoOrder.id}\n🍛 Items: 2x Chicken Biryani\n🛵 Home Delivery: Karachi Address confirmed\n💵 Total Bill: Rs ${autoOrder.total} (Cash on Delivery)\n\nKitchen mein tayyari shuru ho chuki hai aur live tracking map par rider ki bike chalti hui nazar aayegi!`,
         orderPlaced: autoOrder,
+        product: null,
         suggestedQuestions: ["🛵 Live GPS Tracking dekhein", "📱 WhatsApp par receipt mangwayein", "Table reservation kaise karein?"],
       };
     }
 
-    // 5. Bill, Prices, Recipe & Benefits Inquiry
-    if (clean.includes("bill") || clean.includes("recipe") || clean.includes("faiday") || clean.includes("benefit") || clean.includes("banao") || clean.includes("prices")) {
+    // 6. Bill calculation inquiry
+    if (clean.includes("bill") || clean.includes("total") || clean.includes("hisab") || clean.includes("calculate") || clean.includes("banao")) {
       const billData = {
         items: [
           { name: "Chicken Biryani (2 Plates)", price: 1360 },
-          { name: "Mutton Karahi (1 KG Handi)", price: 1450 },
+          { name: "Desi Mutton Karahi (1 KG Handi)", price: 1450 },
           { name: "Charcoal Seekh Kebab (1 Plate)", price: 650 },
         ],
         subtotal: 3460,
@@ -383,14 +514,14 @@ export default function Chatbot() {
       };
 
       return {
-        text: `Yaqeenan! Yeh lijiye aapke muntakhib items ka VIP Bill, Recipe tareeqa aur Sehat Bakhsh Faiday:\n\n📋 **MUKAMMAL BILL ESTIMATE:**\n• 2x Chicken Biryani: Rs 1,360\n• 1x Handi Mutton Karahi: Rs 1,450\n• 1x BBQ Seekh Kebab: Rs 650\n• Delivery Charge (All Karachi): Rs 150\n✨ **Kul Total Raqam:** Rs 3,610\n\n🍲 **SEHAT BAKHSH FAIDAY (HEALTH BENEFITS):**\n• Chicken Biryani: Khalis zafran aur sela basmati chawal jo hazme ke liye behtareen aur lean protein se bharpoor hain.\n• Mutton Karahi: Taaza Mandi ka bakra jo organic desi ghee mein tayyar hota hai — body energy aur zinc se labrez.\n• Seekh Kebab: Koylay par char-grill kiya hua baghair tail ka low-calorie protein.\n\n👨‍🍳 **BANANE KA SHAHI TAREEQA:**\nMitti ki handi aur taambe ki deghon mein dhiymi aanch par dum pukht tayyari hoti hai taakay har laqme mein asli Karachi Mughlai zaiqa aye!`,
+        text: `Yaqeenan! Yeh lijiye aapke muntakhib items ka VIP Bill Estimate:\n\n📋 **MUKAMMAL BILL ESTIMATE:**\n• 2x Chicken Biryani: Rs 1,360\n• 1x Handi Mutton Karahi: Rs 1,450\n• 1x BBQ Seekh Kebab: Rs 650\n• Delivery Charge (All Karachi): Rs 150\n✨ **Kul Total Raqam:** Rs 3,610\n\n🍲 **SEHAT BAKHSH FAIDAY:**\n• Chicken Biryani: Khalis zafran aur sela basmati chawal jo hazme ke liye behtareen hain.\n• Mutton Karahi: Taaza Mandi ka bakra organic desi ghee mein tayyar — body energy aur zinc se labrez.\n• Seekh Kebab: Koylay par char-grill low-calorie lean protein.\n\nKya aap yeh items cart mein add kar ke checkout karna chahenge?`,
         bill: billData,
-        product: MENU_RECOMMENDATIONS.biryani,
+        product: null,
         suggestedQuestions: ["Yehi order abhi confirm karein", "Kashmiri Chai add karein", "Delivery kitni der mein aayegi?"],
       };
     }
 
-    // 6. Food items details
+    // 7. Chicken Biryani Inquiry
     if (clean.includes("biryani") || clean.includes("chawal") || clean.includes("rice")) {
       const item = MENU_RECOMMENDATIONS.biryani;
       return {
@@ -400,7 +531,8 @@ export default function Chatbot() {
       };
     }
 
-    if (clean.includes("karahi") || clean.includes("mutton") || clean.includes("gosht") || clean.includes("handi")) {
+    // 8. General Karahi Inquiry
+    if (clean.includes("karahi") || clean.includes("handi")) {
       const item = MENU_RECOMMENDATIONS.karahi;
       return {
         text: `Desi Mitti Handi Mutton Karahi (Rs ${item.price}):\n\n✨ **Khas Maaloomaat:**\n• Recipe: ${item.recipe}\n• Sehat Bakhsh Faiday: ${item.benefits}\n• Har roz taaza zabiha halaal bakray ka gosht.\n\nKya main ise aapke liye order karoon?`,
@@ -409,15 +541,17 @@ export default function Chatbot() {
       };
     }
 
-    if (clean.includes("kebab") || clean.includes("seekh") || clean.includes("bbq")) {
+    // 9. BBQ / Kebab Inquiry
+    if (clean.includes("kebab") || clean.includes("seekh") || clean.includes("bbq") || clean.includes("tikka") || clean.includes("boti")) {
       const item = MENU_RECOMMENDATIONS.kebab;
       return {
-        text: `Charcoal Seekh Kebab (Rs ${item.price}):\n\n✨ **Khas Maaloomaat:**\n• Recipe: ${item.recipe}\n• Sehat Bakhsh Faiday: ${item.benefits}\n• 4 piece rasdar seekhein sath podina chatni.`,
+        text: `Charcoal Seekh Kebab (Rs ${item.price}):\n\n✨ **Khas Maaloomaat:**\n• Recipe: ${item.recipe}\n• Sehat Bakhsh Faiday: ${item.benefits}\n• 4 piece rasdar seekhein sath taaza podina chatni.`,
         product: item,
         suggestedQuestions: ["🛒 Add to Cart (Rs 650)", "Mutton Karahi ka rate?", "Deals dikhayein"],
       };
     }
 
+    // 10. Kashmiri Chai / Tea Inquiry
     if (clean.includes("chai") || clean.includes("tea") || clean.includes("pink")) {
       const item = MENU_RECOMMENDATIONS.chai;
       return {
@@ -427,66 +561,124 @@ export default function Chatbot() {
       };
     }
 
-    if (clean.includes("deal") || clean.includes("platter") || clean.includes("bachat") || clean.includes("family")) {
+    // 11. Dal Makhani Inquiry
+    if (clean.includes("makhani") || clean.includes("daal") || clean.includes("dal")) {
+      const item = MENU_RECOMMENDATIONS.makhani;
+      return {
+        text: `12-Hour Slow Simmered Dal Makhani (Rs ${item.price}):\n\n✨ **Khas Maaloomaat:**\n• Recipe: ${item.recipe}\n• Sehat Bakhsh Faiday: ${item.benefits}\n• Asli desi makkhan aur taaza malai ka shahi tadka.`,
+        product: item,
+        suggestedQuestions: ["🛒 Add to Cart (Rs 600)", "Rogheni Naan add karein", "Menu dikhayein"],
+      };
+    }
+
+    // 12. Samosa / Starters Inquiry
+    if (clean.includes("samosa") || clean.includes("starter") || clean.includes("snack")) {
+      const item = MENU_RECOMMENDATIONS.samosa;
+      return {
+        text: `Royal Vegetable Samosa (Rs ${item.price} - 2 Pcs):\n\n✨ **Khas Maaloomaat:**\n• Recipe: ${item.recipe}\n• Sehat Bakhsh Faiday: ${item.benefits}\n• Khasta hath-ki-patti aur chatpati khatti-meethi imli chutney.`,
+        product: item,
+        suggestedQuestions: ["🛒 Add to Cart (Rs 200)", "Chai sath add karein", "Biryani rate?"],
+      };
+    }
+
+    // 13. Dessert / Gulab Jamun Inquiry
+    if (clean.includes("gulab jamun") || clean.includes("dessert") || clean.includes("mithai") || clean.includes("meetha") || clean.includes("sweet")) {
+      const item = MENU_RECOMMENDATIONS.dessert;
+      return {
+        text: `Shahi Khoya Gulab Jamun (Rs ${item.price} - 2 Pcs):\n\n✨ **Khas Maaloomaat:**\n• Recipe: ${item.recipe}\n• Sehat Bakhsh Faiday: ${item.benefits}\n• Desi ghee mein tale huye garam garam rasdar jamun.`,
+        product: item,
+        suggestedQuestions: ["🛒 Add to Cart (Rs 300)", "Kashmiri Chai add karein", "Mutton Karahi rate?"],
+      };
+    }
+
+    // 14. Deals & Family Platters Inquiry
+    if (clean.includes("deal") || clean.includes("platter") || clean.includes("bachat") || clean.includes("family") || clean.includes("combo")) {
       const item = MENU_RECOMMENDATIONS.platter;
       return {
-        text: `VIP Shahi Family Feast Platter (20% Discount - Rs ${item.price}):\n\nIs mein Chicken Biryani, 4x BBQ Seekh Kebabs, Rogheni Naan aur Thandi Cold Drinks shamil hain! Poori family ke liye shahi dawat.`,
+        text: `VIP Shahi Family Feast Platter (20% Discount - Rs ${item.price}):\n\nIs mein Chicken Biryani, 4x BBQ Seekh Kebabs, Rogheni Naan aur Thandi Cold Drinks shamil hain! Poori family ke 3-4 afraad ke liye behtareen dawat.`,
         product: item,
         suggestedQuestions: ["🛒 Platter Cart Mein Dalein", "Table reservation kaise hogi?", "Delivery charges?"],
       };
     }
 
-    if (clean.includes("location") || clean.includes("address") || clean.includes("kahan") || clean.includes("karachi")) {
+    // 15. Location & Address Inquiry
+    if (clean.includes("location") || clean.includes("address") || clean.includes("kahan") || clean.includes("karachi") || clean.includes("branch") || clean.includes("pata")) {
       return {
         text: "📍 Al Madina Restaurant ka Karachi Address:\n25, 2 1/2 Korangi, Sector 33-B / 36-B, Korangi, Karachi, Pakistan.\n\nWebsite ke Contact section mein interactive live map aur Google Maps directions ka live button bhi mojood hai!",
+        product: null,
         suggestedQuestions: ["⏰ Khulne ka waqt kya hai?", "🛵 Delivery charges kitne hain?", "Menu dekhein"],
       };
     }
 
-    if (clean.includes("timing") || clean.includes("time") || clean.includes("waqt") || clean.includes("open") || clean.includes("hours")) {
+    // 16. Timings Inquiry
+    if (clean.includes("timing") || clean.includes("time") || clean.includes("waqt") || clean.includes("open") || clean.includes("hours") || clean.includes("kab")) {
       return {
         text: "⏰ Al Madina Restaurant Rozana dopahar 12:00 PM se raat 12:00 AM tak khula rehta hai (Dine-in, Takeaway aur Home Delivery tamam waqt dastiyab hain).",
+        product: null,
         suggestedQuestions: ["Table book karein", "Delivery charge kitna hai?", "Menu rate list"],
       };
     }
 
-    if (clean.includes("track") || clean.includes("delivery") || clean.includes("rider") || clean.includes("charges")) {
+    // 17. Delivery & Tracking Inquiry
+    if (clean.includes("track") || clean.includes("delivery") || clean.includes("rider") || clean.includes("charges") || clean.includes("fare")) {
       return {
         text: "🛵 Karachi bhar mein home delivery charges sirf Rs 150 hain. Order confirm hotay hi live GPS map par bike chalti hui aapke ghar ki taraf nazar aati hai!",
+        product: null,
         suggestedQuestions: ["Order History & Live Track", "WhatsApp par rabta", "Menu dikhayein"],
       };
     }
 
-    if (clean.includes("table") || clean.includes("reservation") || clean.includes("book")) {
+    // 18. Table Reservation Inquiry
+    if (clean.includes("table") || clean.includes("reservation") || clean.includes("book") || clean.includes("seat") || clean.includes("family hall")) {
       return {
-        text: "🍽️ Table Book karne ke liye navbar mein 'Reservations' par jayein. Apna naam, phone, tareekh aur mehmaano ki tadaad darj karein — table foran secure ho jayegi!",
+        text: "🍽️ Table Book karne ke liye navbar mein 'Reservations' par jayein. Apna naam, phone, tareekh aur mehmaano ki tadaad darj karein — VIP family seating foran confirm ho jayegi!",
+        product: null,
         suggestedQuestions: ["Table booking page kholen", "Family Hall seating hai?", "Menu rate list"],
       };
     }
 
-    // Default friendly conversational response
+    // 19. Friendly Greetings & Chit-chat (Wa Alaikum Assalam / Hello / Bhai)
+    const isGreeting = clean.includes("salam") || clean.includes("hello") || clean.includes("hi") || clean.includes("kaise") || clean.includes("kese") || clean === "bhai" || clean === "bro";
+    if (isGreeting) {
+      return {
+        text: "Wa Alaikum Assalam Bhai Jaan! Al Madina Restaurant Karachi ke Shahi Dastarkhwan par khush aamdeed! 👑\n\nAaj dawat mein kya tayyar karwayein? Hamare paas taaza Desi Mutton Karahi, Dum Pukht Chicken Biryani, Charcoal BBQ Seekh Kebabs aur Shahi Kashmiri Pink Chai dastyab hain. Kisi bhi dish ka rate, mukammal bill estimate ya recipe poochna chahein to farmayein!",
+        product: null,
+        suggestedQuestions: [
+          "🍖 Mutton Karahi aur rates?",
+          "🍛 Chicken Biryani ki price aur recipe?",
+          "🧾 Mera mukammal bill bana do",
+          "📍 Restaurant location aur timings?",
+        ],
+      };
+    }
+
+    // 20. Default Conversational Hospitality (Does NOT attach Biryani blindly)
     return {
-      text: "Main Al Madina Restaurant Karachi ka AI host hoon. Aap mujh se kisi bhi dish ka bill banwa sakte hain, recipe aur sehat bakhsh faiday pooch sakte hain, ya direct address bhej kar khana mangwa sakte hain. Aaj dawat mein kya tayyar karwayein?",
-      product: MENU_RECOMMENDATIONS.biryani,
-      suggestedQuestions: ["🍛 Chicken Biryani ki recipe aur faiday?", "🧾 Mera bill banao", "📍 Location aur timings?"],
+      text: "Main Al Madina Restaurant Karachi ka AI host hoon. Aap mujh se kisi bhi dish (Mutton Karahi, Biryani, Seekh Kebab, Dal Makhani, Kashmiri Chai) ka rate aur mukammal bill pooch sakte hain, recipe aur sehat bakhsh faiday maloom kar sakte hain, ya apna pata bhej kar direct khana mangwa sakte hain. Aaj dawat mein kya shamil karein?",
+      product: null,
+      suggestedQuestions: [
+        "🍖 Mutton Karahi ki price aur details?",
+        "🍛 Chicken Biryani ki recipe aur rate?",
+        "🧾 Mera bill banao (2 Biryani + 1 Karahi)",
+        "📍 Karachi branch kahan hai?",
+      ],
     };
   };
 
-  const handleSend = (textToSend = null) => {
+  const handleSend = async (textToSend = null) => {
     const text = (typeof textToSend === "string" ? textToSend : input).trim();
     if (!text) return;
 
     const userMsg = { id: "msg_" + Date.now(), from: "user", text };
     const updatedMessages = [...messages, userMsg];
 
-    // Update active session in state
     setSessions((prev) =>
       prev.map((s) => {
         if (s.id === currentChatId) {
-          // If title was default, give it a title from the first query
-          const title = s.title === "New Chat" || s.title === "Shahi Dawat Guftagu"
-            ? text.slice(0, 24) + "..."
-            : s.title;
+          const title =
+            s.title === "New Chat" || s.title === "Shahi Dawat Guftagu"
+              ? text.slice(0, 24) + "..."
+              : s.title;
           return { ...s, title, messages: updatedMessages };
         }
         return s;
@@ -496,14 +688,13 @@ export default function Chatbot() {
     setInput("");
     setIsTyping(true);
 
-    // Simulate typing delay (350ms) then stream pen-writing
-    setTimeout(() => {
-      const response = processResponse(text);
+    setTimeout(async () => {
+      const response = await processResponse(text);
       streamBotMessage(response, updatedMessages);
-    }, 400);
+    }, 350);
   };
 
-  // Chat Sessions Management: New, Rename, Archive, Delete
+  // Chat Sessions Management
   const handleNewChat = () => {
     const newId = "chat_" + Date.now();
     const newChat = {
@@ -535,7 +726,15 @@ export default function Chatbot() {
 
   const handleDeleteChat = (chatId) => {
     if (sessions.length <= 1) {
-      handleNewChat();
+      setSessions([
+        {
+          id: "chat_default",
+          title: "New Chat",
+          archived: false,
+          createdAt: Date.now(),
+          messages: [INITIAL_MESSAGE],
+        },
+      ]);
       return;
     }
     const filtered = sessions.filter((s) => s.id !== chatId);
@@ -545,13 +744,18 @@ export default function Chatbot() {
     }
   };
 
-  // Scroll Helpers
+  // Scroll Helpers: Only Up (Top) & Down (Bottom) per user request
   const scrollChat = (direction) => {
     if (!scrollRef.current) return;
-    if (direction === "up") scrollRef.current.scrollTop -= 200;
-    if (direction === "down") scrollRef.current.scrollTop += 200;
-    if (direction === "left") scrollRef.current.scrollLeft -= 150;
-    if (direction === "right") scrollRef.current.scrollLeft += 150;
+    if (direction === "top") {
+      scrollRef.current.scrollTo({ top: 0, behavior: "smooth" });
+    }
+    if (direction === "down") {
+      scrollRef.current.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+    }
   };
 
   return (
@@ -600,45 +804,90 @@ export default function Chatbot() {
           to { opacity: 1; transform: translateY(0) scale(1); }
         }
         .am-chat-header {
-          background: linear-gradient(115deg, #0A0A0A 0%, #17150F 100%);
           padding: 12px 16px;
+          background: linear-gradient(90deg, #16140D, #0B0A08);
+          border-bottom: 1px solid rgba(212,175,55,0.25);
           display: flex;
           align-items: center;
           justify-content: space-between;
-          border-bottom: 1px solid rgba(212,175,55,0.25);
         }
         .am-chat-body {
           flex: 1;
           overflow-y: auto;
-          overflow-x: auto;
-          padding: 14px;
+          padding: 16px;
           display: flex;
           flex-direction: column;
           gap: 12px;
-          scroll-behavior: smooth;
+          background: radial-gradient(circle at top right, rgba(212,175,55,0.06), transparent 70%);
         }
         .am-bubble {
-          max-width: 90%;
-          padding: 12px 15px;
+          max-width: 88%;
+          padding: 11px 14px;
           border-radius: 16px;
           font-size: 13px;
-          line-height: 1.55;
-          white-space: pre-wrap;
+          line-height: 1.5;
           word-break: break-word;
-        }
-        .am-bubble.bot {
-          background: rgba(255,255,255,0.05);
-          border: 1px solid rgba(212,175,55,0.25);
-          color: #FBF7EF;
-          border-bottom-left-radius: 4px;
-          align-self: flex-start;
+          white-space: pre-wrap;
         }
         .am-bubble.user {
-          background: linear-gradient(135deg, #D4AF37, #C49B28);
+          align-self: flex-end;
+          background: linear-gradient(135deg, #D4AF37, #E8C15A);
           color: #0A0A0A;
           font-weight: 500;
           border-bottom-right-radius: 4px;
-          align-self: flex-end;
+          box-shadow: 0 4px 12px rgba(212,175,55,0.25);
+        }
+        .am-bubble.bot {
+          align-self: flex-start;
+          background: #181611;
+          border: 1px solid rgba(212,175,55,0.2);
+          color: #F5E9C8;
+          border-bottom-left-radius: 4px;
+        }
+        .am-chat-footer {
+          padding: 10px 14px;
+          background: #100F0C;
+          border-top: 1px solid rgba(212,175,55,0.2);
+        }
+        .am-chat-input-wrap {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          background: #1B1812;
+          border: 1px solid rgba(212,175,55,0.3);
+          border-radius: 14px;
+          padding: 4px 6px 4px 12px;
+          transition: border-color 0.2s ease;
+        }
+        .am-chat-input-wrap:focus-within {
+          border-color: #D4AF37;
+          box-shadow: 0 0 10px rgba(212,175,55,0.25);
+        }
+        .am-chat-input {
+          flex: 1;
+          background: transparent;
+          border: none;
+          outline: none;
+          color: #FFFFFF;
+          font-size: 13px;
+        }
+        .am-chat-send {
+          width: 34px;
+          height: 34px;
+          border-radius: 10px;
+          background: linear-gradient(135deg, #D4AF37, #F0DFA0);
+          color: #0A0A0A;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: transform 0.15s ease;
+        }
+        .am-chat-send:hover {
+          transform: scale(1.06);
+        }
+        .am-chat-send:disabled {
+          opacity: 0.4;
+          transform: none;
         }
         .am-typing-dots span {
           display: inline-block;
@@ -647,115 +896,115 @@ export default function Chatbot() {
           border-radius: 50%;
           background: #D4AF37;
           margin: 0 2px;
-          animation: am-bounce 1s infinite alternate;
+          animation: am-dot-pulse 1.2s infinite ease-in-out;
         }
         .am-typing-dots span:nth-child(2) { animation-delay: 0.2s; }
         .am-typing-dots span:nth-child(3) { animation-delay: 0.4s; }
-        @keyframes am-bounce {
-          from { transform: translateY(0); opacity: 0.4; }
-          to { transform: translateY(-5px); opacity: 1; }
-        }
-        .pen-cursor::after {
-          content: " ✍️";
-          animation: blinkCursor 0.7s infinite;
-        }
-        @keyframes blinkCursor {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.2; }
+        @keyframes am-dot-pulse {
+          0%, 80%, 100% { transform: scale(0.6); opacity: 0.3; }
+          40% { transform: scale(1.2); opacity: 1; }
         }
       `}</style>
 
+      {/* Floating Chat Button */}
       {!open && (
         <button
-          className="am-chat-fab"
-          onClick={() => setOpen(true)}
-          aria-label="Open Al Madina AI Assistant"
+          type="button"
+          onClick={handleOpenChatbot}
+          className="am-chat-fab cursor-pointer"
+          aria-label="Open Al Madina AI Host"
         >
           <MessageCircle size={26} />
+          <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-[#0A0A0A] animate-pulse" />
         </button>
       )}
 
+      {/* Main Chat Window */}
       {open && (
-        <div className="am-chat-window relative flex flex-col">
+        <div className="am-chat-window">
           {/* Header */}
           <div className="am-chat-header">
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-[#D4AF37] hover:bg-white/10 transition-colors"
-                title="Toggle Chat History"
+                className="p-1 rounded-md text-white/70 hover:text-[#D4AF37] hover:bg-white/5 transition-colors"
+                title="Chat History"
               >
-                <MenuIcon size={16} />
+                <MenuIcon size={18} />
               </button>
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-[#D4AF37]/20 border border-[#D4AF37]/40 flex items-center justify-center text-[#D4AF37]">
-                  <Bot size={17} />
+
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#1C180A] to-[#0A0A0A] border border-[#D4AF37]/50 flex items-center justify-center">
+                <Bot size={16} className="text-[#F0DFA0]" />
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <h4 className="text-xs font-bold text-white tracking-wide" style={{ fontFamily: "'Amiri', serif" }}>
+                    Al Madina AI Shahi Host
+                  </h4>
+                  <Crown size={12} className="text-[#D4AF37]" />
                 </div>
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-white text-xs sm:text-sm font-bold truncate max-w-[130px]">
-                      {currentSession.title}
-                    </span>
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  </div>
-                  <p className="text-[10px] text-[#D4AF37]">Karachi AI Host · Multi-Chat</p>
-                </div>
+                <p className="text-[10px] text-emerald-400 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block animate-ping" />
+                  Live Hospitality {userApiKey ? "(Gemini Connected)" : ""}
+                </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1">
+              {/* API Settings Button */}
+              <button
+                type="button"
+                onClick={() => setApiKeyModalOpen(true)}
+                className="p-1.5 text-white/60 hover:text-[#D4AF37] hover:bg-white/5 rounded-md transition-colors"
+                title="AI Engine / API Settings"
+              >
+                <Settings size={15} />
+              </button>
+
               <button
                 type="button"
                 onClick={handleNewChat}
-                className="px-2 py-1 bg-[#D4AF37]/15 hover:bg-[#D4AF37]/25 border border-[#D4AF37]/40 rounded-lg text-[#F0DFA0] text-[11px] font-semibold flex items-center gap-1"
+                className="p-1.5 text-white/60 hover:text-[#D4AF37] hover:bg-white/5 rounded-md transition-colors"
                 title="New Chat"
               >
-                <Plus size={13} /> New
+                <Plus size={16} />
               </button>
               <button
+                type="button"
                 onClick={() => setOpen(false)}
+                className="p-1.5 text-white/60 hover:text-white hover:bg-white/5 rounded-md transition-colors"
                 aria-label="Close chat"
-                className="w-7 h-7 rounded-full bg-white/5 flex items-center justify-center text-white/60 hover:text-white"
               >
                 <X size={16} />
               </button>
             </div>
           </div>
 
-          {/* Collapsible ChatGPT-style Sidebar for Chat History */}
+          {/* Sidebar Drawer: Chat History (ChatGPT style) */}
           {sidebarOpen && (
-            <div className="absolute inset-y-0 left-0 w-64 bg-[#12100B] border-r border-[#D4AF37]/30 z-30 flex flex-col shadow-2xl animate-fade-in">
-              <div className="p-3 border-b border-white/10 flex items-center justify-between">
-                <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                  <Archive size={14} className="text-[#D4AF37]" /> Chat History
+            <div className="bg-[#12100C] border-b border-[#D4AF37]/20 p-3 max-h-56 overflow-y-auto animate-fade-in text-xs text-white/80">
+              <div className="flex items-center justify-between pb-2 border-b border-white/10 mb-2">
+                <span className="font-bold text-[#F0DFA0] flex items-center gap-1">
+                  <Archive size={13} /> Chat Sessions History
                 </span>
-                <button
-                  onClick={() => setSidebarOpen(false)}
-                  className="text-white/60 hover:text-white"
-                >
-                  <X size={15} />
-                </button>
-              </div>
-
-              <div className="p-2">
                 <button
                   type="button"
                   onClick={handleNewChat}
-                  className="w-full py-2 px-3 bg-gradient-to-r from-[#D4AF37] to-[#F0DFA0] text-black font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 hover:brightness-105"
+                  className="px-2 py-1 rounded bg-[#D4AF37]/20 text-[#F0DFA0] hover:bg-[#D4AF37]/30 flex items-center gap-1 text-[11px]"
                 >
-                  <Plus size={14} /> Start New Chat
+                  <Plus size={11} /> New Chat
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+              <div className="space-y-1">
                 {sessions.map((sess) => (
                   <div
                     key={sess.id}
-                    className={`group p-2 rounded-xl border text-xs flex items-center justify-between gap-1 transition-all ${
+                    className={`p-2 rounded-lg flex items-center justify-between gap-2 group transition-colors ${
                       sess.id === currentChatId
-                        ? "bg-[#D4AF37]/20 border-[#D4AF37] text-white"
-                        : "bg-white/5 border-transparent text-white/70 hover:bg-white/10"
+                        ? "bg-[#D4AF37]/20 text-[#FFF2A3] border border-[#D4AF37]/40"
+                        : "hover:bg-white/5 text-white/70"
                     }`}
                   >
                     {editingTitleId === sess.id ? (
@@ -764,15 +1013,15 @@ export default function Chatbot() {
                           type="text"
                           value={titleInput}
                           onChange={(e) => setTitleInput(e.target.value)}
-                          className="w-full bg-black/60 border border-[#D4AF37] text-white rounded px-1.5 py-0.5 text-xs outline-none"
+                          className="bg-black/60 border border-white/20 rounded px-1.5 py-0.5 text-xs text-white flex-1"
                           autoFocus
-                          onKeyDown={(e) => e.key === "Enter" && handleRenameChat(sess.id)}
                         />
                         <button
+                          type="button"
                           onClick={() => handleRenameChat(sess.id)}
-                          className="text-emerald-400 text-[11px]"
+                          className="text-emerald-400 p-0.5 hover:text-emerald-300"
                         >
-                          ✓
+                          <Check size={12} />
                         </button>
                       </div>
                     ) : (
@@ -825,41 +1074,27 @@ export default function Chatbot() {
             </div>
           )}
 
-          {/* Scroll Direction Controls Helper Bar */}
-          <div className="px-3 py-1 bg-black/50 border-b border-white/5 flex items-center justify-between text-[11px] text-white/60">
-            <span className="text-[10px]">Nav Scroll:</span>
-            <div className="flex items-center gap-1">
+          {/* Scroll Direction Controls Helper Bar (Top & Down Only per user instructions) */}
+          <div className="px-3 py-1 bg-black/60 border-b border-white/5 flex items-center justify-between text-[11px] text-white/60">
+            <span className="text-[10px] flex items-center gap-1 text-white/50">
+              <CornerDownRight size={10} className="text-[#D4AF37]" /> Chat Scroll:
+            </span>
+            <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => scrollChat("up")}
-                className="px-1.5 py-0.5 bg-white/5 hover:bg-white/10 rounded text-[10px]"
-                title="Scroll Up"
+                onClick={() => scrollChat("top")}
+                className="px-2 py-0.5 bg-white/5 hover:bg-[#D4AF37]/20 hover:text-[#F0DFA0] rounded text-[10px] transition-colors"
+                title="Scroll to Top"
               >
-                ▲ Up
+                ▲ Top
               </button>
               <button
                 type="button"
                 onClick={() => scrollChat("down")}
-                className="px-1.5 py-0.5 bg-white/5 hover:bg-white/10 rounded text-[10px]"
-                title="Scroll Down"
+                className="px-2 py-0.5 bg-white/5 hover:bg-[#D4AF37]/20 hover:text-[#F0DFA0] rounded text-[10px] transition-colors"
+                title="Scroll to Bottom"
               >
                 ▼ Down
-              </button>
-              <button
-                type="button"
-                onClick={() => scrollChat("left")}
-                className="px-1.5 py-0.5 bg-white/5 hover:bg-white/10 rounded text-[10px]"
-                title="Scroll Left"
-              >
-                ◀ Left
-              </button>
-              <button
-                type="button"
-                onClick={() => scrollChat("right")}
-                className="px-1.5 py-0.5 bg-white/5 hover:bg-white/10 rounded text-[10px]"
-                title="Scroll Right"
-              >
-                ▶ Right
               </button>
             </div>
           </div>
@@ -898,103 +1133,91 @@ export default function Chatbot() {
 
                 {/* Auto Order Placed Banner */}
                 {m.orderPlaced && (
-                  <div className="mt-3 p-3 bg-emerald-500/15 border border-emerald-500/40 rounded-xl text-emerald-300 text-xs space-y-1">
-                    <p className="font-bold flex items-center gap-1">
-                      <CheckCircle2 size={14} /> Order #{m.orderPlaced.id} Confirmed!
-                    </p>
-                    <p className="text-[11px] text-emerald-200/80">
-                      Rider GPS live map par activate ho chuka hai.
+                  <div className="mt-3 p-3 bg-emerald-950/60 border border-emerald-500/50 rounded-xl space-y-1 text-emerald-200">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
+                      <CheckCircle2 size={15} /> Order #{m.orderPlaced.id} Dispatched to Kitchen!
+                    </div>
+                    <p className="text-[11px] text-emerald-300/80">
+                      Cash on Delivery · Karachi Home Delivery confirmed.
                     </p>
                   </div>
                 )}
 
-                {/* Review Prompt Card */}
-                {m.reviewPrompt && (
-                  <div className="mt-3 p-2.5 bg-black/60 border border-amber-500/40 rounded-xl">
-                    <p className="text-xs text-white mb-2">
-                      Apni raye se doosre mehmaano ki rehnumai karein:
-                    </p>
-                    <a
-                      href="/#reviews"
-                      onClick={() => setOpen(false)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#D4AF37] text-black font-bold text-xs rounded-lg hover:bg-[#F0DFA0] transition-colors"
-                    >
-                      <Star size={13} /> Reviews Par Review Likhein
-                    </a>
-                  </div>
-                )}
-
-                {/* WhatsApp Support Direct Button */}
-                {m.whatsappSupport && (
-                  <div className="mt-3 flex gap-2">
-                    <a
-                      href={`https://wa.me/${RESTAURANT_PHONE.replace(/[^0-9]/g, "")}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex-1 py-1.5 px-2.5 bg-[#25D366] text-black text-xs font-bold rounded-lg flex items-center justify-center gap-1"
-                    >
-                      <Phone size={13} /> WhatsApp Rabta
-                    </a>
-                    <a
-                      href="mailto:contact@almadinarestaurant.pk"
-                      className="flex-1 py-1.5 px-2.5 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1"
-                    >
-                      <Mail size={13} /> Email Send
-                    </a>
-                  </div>
-                )}
-
-                {/* Product Card with Add to Cart */}
+                {/* Single Product Card */}
                 {m.product && (
-                  <div className="mt-3 p-2.5 bg-black/60 border border-[#D4AF37]/40 rounded-xl text-white">
-                    <div className="flex items-center gap-2.5 mb-2">
-                      <img
-                        src={m.product.image}
-                        alt={m.product.name}
-                        className="w-12 h-12 rounded-lg object-cover border border-[#D4AF37]/30"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1">
-                          <Crown size={12} className="text-[#D4AF37]" />
-                          <p className="text-xs font-bold truncate text-white">{m.product.name}</p>
-                        </div>
-                        <p className="text-[11px] text-white/60 line-clamp-1">{m.product.desc}</p>
-                        <p className="text-xs font-semibold text-[#D4AF37]">Rs {m.product.price}</p>
-                      </div>
+                  <div className="mt-3 p-2.5 rounded-xl bg-black/50 border border-[#D4AF37]/35 flex items-center gap-3">
+                    <img
+                      src={m.product.image}
+                      alt={m.product.name}
+                      className="w-14 h-14 rounded-lg object-cover border border-[#D4AF37]/30 shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <h5 className="text-xs font-bold text-white truncate">{m.product.name}</h5>
+                      <p className="text-[10px] text-white/60 line-clamp-1">{m.product.desc}</p>
+                      <p className="text-xs font-bold text-[#D4AF37] mt-0.5">Rs {m.product.price}</p>
                     </div>
                     <button
                       type="button"
                       onClick={() => handleAddToCart(m.product)}
-                      className={`w-full py-1.5 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
-                        addedItem === m.product.id
-                          ? "bg-emerald-500 text-black"
-                          : "bg-gradient-to-r from-[#D4AF37] to-[#F0DFA0] text-black hover:brightness-110"
-                      }`}
+                      className="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-[#D4AF37] to-[#F0DFA0] text-black font-bold text-[11px] shrink-0 hover:brightness-110 flex items-center gap-1 transition-all"
                     >
                       {addedItem === m.product.id ? (
                         <>
-                          <Check size={13} /> Added to Cart!
+                          <Check size={12} /> Added!
                         </>
                       ) : (
                         <>
-                          <ShoppingCart size={13} /> Add to Cart (Rs {m.product.price})
+                          <ShoppingCart size={12} /> Add
                         </>
                       )}
                     </button>
                   </div>
                 )}
 
-                {/* Follow-up question chips */}
+                {/* Review Prompt Option */}
+                {m.reviewPrompt && (
+                  <div className="mt-3 pt-2 border-t border-white/10 flex items-center justify-between">
+                    <span className="text-[11px] text-[#F0DFA0] flex items-center gap-1">
+                      <Star size={12} className="text-amber-400 fill-amber-400" /> Share your experience:
+                    </span>
+                    <a
+                      href="/#reviews"
+                      onClick={() => setOpen(false)}
+                      className="px-2.5 py-1 rounded bg-[#D4AF37]/20 border border-[#D4AF37]/40 text-[#F0DFA0] text-xs font-semibold hover:bg-[#D4AF37]/30"
+                    >
+                      Write Review
+                    </a>
+                  </div>
+                )}
+
+                {/* Direct WhatsApp Contact */}
+                {m.whatsappSupport && (
+                  <div className="mt-3 pt-2 border-t border-white/10 flex items-center justify-between">
+                    <span className="text-[11px] text-emerald-400 flex items-center gap-1">
+                      <Phone size={12} /> Instant Manager Support:
+                    </span>
+                    <a
+                      href={`https://wa.me/92${RESTAURANT_PHONE.replace(/^0/, "").replace(/\D/g, "")}?text=${encodeURIComponent("Assalam o Alaikum Al Madina Restaurant!")}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2.5 py-1 rounded bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 text-xs font-semibold hover:bg-emerald-600/50"
+                    >
+                      Open WhatsApp
+                    </a>
+                  </div>
+                )}
+
+                {/* Suggested Questions Chips */}
                 {m.suggestedQuestions && m.suggestedQuestions.length > 0 && (
-                  <div className="mt-2.5 pt-2 border-t border-white/10 flex flex-wrap gap-1">
-                    {m.suggestedQuestions.map((q, idx) => (
+                  <div className="mt-3 pt-2 border-t border-white/10 flex flex-wrap gap-1.5">
+                    {m.suggestedQuestions.map((sq, sidx) => (
                       <button
-                        key={idx}
+                        key={sidx}
                         type="button"
-                        onClick={() => handleSend(q)}
-                        className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 hover:bg-[#D4AF37]/20 border border-white/10 hover:border-[#D4AF37]/40 text-[#F0DFA0] transition-colors flex items-center gap-1"
+                        onClick={() => handleSend(sq)}
+                        className="text-[10px] px-2 py-1 rounded-full bg-white/5 hover:bg-[#D4AF37]/25 border border-white/10 hover:border-[#D4AF37]/50 text-white/80 hover:text-white transition-all text-left"
                       >
-                        <CornerDownRight size={10} /> {q}
+                        {sq}
                       </button>
                     ))}
                   </div>
@@ -1002,57 +1225,150 @@ export default function Chatbot() {
               </div>
             ))}
 
-            {/* Live Pen-Writing Typewriter Effect */}
+            {/* Pen-style Typewriter streaming in progress */}
             {typewriterText && (
-              <div className="am-bubble bot pen-cursor">
+              <div className="am-bubble bot">
                 <p>{typewriterText}</p>
+                <span className="inline-block w-1.5 h-3.5 bg-[#D4AF37] ml-0.5 animate-pulse" />
               </div>
             )}
 
-            {/* Typing indicator */}
+            {/* Typing Dots Indicator */}
             {isTyping && (
-              <div className="am-bubble bot flex items-center gap-2 text-xs text-[#D4AF37]">
-                <span>Al Madina Host is drafting</span>
-                <span className="am-typing-dots inline-flex items-center">
-                  <span />
-                  <span />
-                  <span />
-                </span>
+              <div className="am-bubble bot am-typing-dots">
+                <span />
+                <span />
+                <span />
               </div>
             )}
           </div>
 
-          {/* Character counter & Input Footer */}
-          <div className="p-2.5 bg-black/70 border-t border-white/10 flex flex-col gap-1">
-            <div className="flex items-center justify-between px-1 text-[10px] text-white/40">
-              <span>Smart Language Tolerance (Auto-Detect)</span>
-              <span>{input.length} / 500 chars</span>
-            </div>
-
+          {/* Footer Input */}
+          <div className="am-chat-footer">
             <form
               onSubmit={(e) => {
                 e.preventDefault();
                 handleSend();
               }}
-              className="flex gap-2"
+              className="space-y-1.5"
             >
-              <input
-                type="text"
-                maxLength={500}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Biryani, karahi, bill banao, address..."
-                className="flex-1 bg-white/[0.06] border border-[#D4AF37]/35 rounded-xl px-3.5 py-2 text-xs text-white outline-none focus:border-[#D4AF37]"
-              />
-              <button
-                type="submit"
-                disabled={!input.trim()}
-                className="w-9 h-9 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#F0DFA0] text-black flex items-center justify-center shrink-0 hover:scale-105 transition-transform disabled:opacity-40"
-                aria-label="Send message"
-              >
-                <Send size={15} />
-              </button>
+              <div className="am-chat-input-wrap">
+                <input
+                  type="text"
+                  value={input}
+                  maxLength={500}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder="Button / Mutton price, biryani, bill calculation..."
+                  className="am-chat-input"
+                />
+                <button
+                  type="submit"
+                  disabled={!input.trim() || isTyping}
+                  className="am-chat-send cursor-pointer"
+                  aria-label="Send message"
+                >
+                  <Send size={15} />
+                </button>
+              </div>
+
+              {/* Character Counter & Notice */}
+              <div className="flex items-center justify-between text-[10px] text-white/40 px-1">
+                <span>Al Madina AI Shahi Host</span>
+                <span className={input.length > 450 ? "text-amber-400 font-mono" : "font-mono"}>
+                  {input.length} / 500 chars
+                </span>
+              </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* API Key Setup Modal */}
+      {apiKeyModalOpen && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="max-w-md w-full bg-[#110F0A] border border-[#D4AF37]/50 rounded-2xl p-6 shadow-2xl text-white">
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/40 flex items-center justify-center text-[#D4AF37]">
+                  <Key size={18} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Google Gemini API Settings</h3>
+                  <p className="text-xs text-white/60">Connect live AI model to Al Madina Host</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setApiKeyModalOpen(false)}
+                className="p-1 rounded-lg hover:bg-white/10 text-white/60 hover:text-white"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="text-xs text-white/80 space-y-2 mb-4 bg-white/5 p-3 rounded-xl border border-white/10">
+              <p className="font-semibold text-[#F0DFA0] flex items-center gap-1">
+                <Sparkles size={13} className="text-[#D4AF37]" /> Gemini API Kaise Hasil Karein? (3 Aasan Steps):
+              </p>
+              <ol className="list-decimal list-inside space-y-1 text-white/70">
+                <li>Google AI Studio (<span className="text-[#D4AF37]">aistudio.google.com</span>) par jayein.</li>
+                <li><strong>"Get API key"</strong> par click kar ke Free API Key create karein.</li>
+                <li>Key copy kar ke nechy diye gaye box mein paste kar ke Save karein!</li>
+              </ol>
+              <p className="text-[11px] text-white/50 italic pt-1">
+                Note: Agar aap API key nahi lagate, to bhi built-in Shahi Host tamam sawalat, Mutton/Biryani prices, recipes aur bills ka jawab deta rahega!
+              </p>
+            </div>
+
+            <div className="space-y-2 mb-4">
+              <label className="text-xs font-medium text-white/70 block">
+                Gemini API Key (Optional):
+              </label>
+              <input
+                type="password"
+                value={apiKeyInput}
+                onChange={(e) => setApiKeyInput(e.target.value)}
+                placeholder="AIzaSy..."
+                className="w-full px-3 py-2 rounded-xl bg-black/60 border border-white/20 focus:border-[#D4AF37] outline-none text-xs font-mono text-white"
+              />
+            </div>
+
+            {apiSaveNotice && (
+              <p className="text-xs text-emerald-400 mb-3 font-medium flex items-center gap-1">
+                <CheckCircle2 size={13} /> {apiSaveNotice}
+              </p>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
+              {userApiKey && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUserApiKey("");
+                    setApiKeyInput("");
+                    localStorage.removeItem(STORAGE_GEMINI_KEY);
+                    setApiSaveNotice("API Key remove kar di gayi. Built-in host active hai.");
+                  }}
+                  className="px-3 py-1.5 rounded-lg text-xs text-red-400 hover:bg-red-500/10"
+                >
+                  Remove Key
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setApiKeyModalOpen(false)}
+                className="px-3.5 py-1.5 rounded-lg text-xs bg-white/10 hover:bg-white/15 text-white"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveApiKey}
+                className="px-4 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-[#D4AF37] to-[#F0DFA0] text-black hover:brightness-110"
+              >
+                Save Settings
+              </button>
+            </div>
           </div>
         </div>
       )}

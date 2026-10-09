@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { Search, Flame, Leaf, ShoppingCart, Heart, Crown } from "lucide-react";
 import { useCart } from "../context/CartContext";
 import { useFavorites } from "../context/FavoritesContext";
+import { useVIPLoader } from "../context/LoadingContext";
 import { flyToCart } from "../utils/flyToCart";
 
 // ============================================================
@@ -153,6 +154,7 @@ const MENU_ITEMS = [
 export default function Menu() {
   const { addToCart } = useCart();
   const { isFavorite, toggleFavorite } = useFavorites();
+  const { triggerLoader } = useVIPLoader();
   const [activeCategory, setActiveCategory] = useState("All");
   const [query, setQuery] = useState("");
   const [searchParams] = useSearchParams();
@@ -343,7 +345,12 @@ export default function Menu() {
                   <button
                     onClick={(e) => {
                       flyToCart(item.image, e.currentTarget);
-                      addToCart({ id: item.id, name: item.name, price: item.price, image: item.image });
+                      triggerLoader(
+                        "👑 Shahi Cart Update",
+                        `"${item.name}" dastarkhwan cart mein darj kiya ja raha hai...`,
+                        1200,
+                        () => addToCart({ id: item.id, name: item.name, price: item.price, image: item.image })
+                      );
                     }}
                     className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#F0DFA0] text-black font-bold text-xs flex items-center justify-center gap-2 hover:brightness-110 transition-all shadow-md"
                   >
@@ -409,7 +416,14 @@ export default function Menu() {
                       </span>
                     )}
                     <button
-                      onClick={() => toggleFavorite({ id: item.id, name: item.name, price: item.price, image: item.image })}
+                      onClick={() => {
+                        triggerLoader(
+                          "💖 VIP Favorites",
+                          `"${item.name}" aapki pasandeeda list mein update ho raha hai...`,
+                          1100,
+                          () => toggleFavorite({ id: item.id, name: item.name, price: item.price, image: item.image })
+                        );
+                      }}
                       className="am-fav-btn"
                       aria-label="Toggle favorite"
                     >
@@ -463,7 +477,12 @@ export default function Menu() {
                             ? Math.round(item.price * (1 - item.discount / 100))
                             : item.price;
                         flyToCart(item.image, e.currentTarget);
-                        addToCart({ id: item.id, name: item.name, price: finalPrice, image: item.image });
+                        triggerLoader(
+                          "🛒 Shahi Cart Update",
+                          `"${item.name}" shahi cart mein shamil kiya ja raha hai...`,
+                          1200,
+                          () => addToCart({ id: item.id, name: item.name, price: finalPrice, image: item.image })
+                        );
                       }}
                       className="am-add-btn flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs"
                     >
