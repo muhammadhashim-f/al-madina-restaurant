@@ -155,18 +155,80 @@ function createMockSupabaseClient() {
         return { data: { user: session.user }, error: null };
       },
     },
-    from(_tableName) {
-      const query = {
-        select: () => query,
-        insert: () => Promise.resolve({ data: [], error: null }),
-        update: () => Promise.resolve({ data: [], error: null }),
-        delete: () => Promise.resolve({ data: [], error: null }),
-        eq: () => query,
-        order: () => query,
-        single: () => Promise.resolve({ data: null, error: null }),
-        then: (resolve) => resolve({ data: [], error: null }),
+    from(tableName) {
+      const getRows = () => {
+        try {
+          const raw = localStorage.getItem(`am_mock_tbl_${tableName}`);
+          return raw ? JSON.parse(raw) : [];
+        } catch {
+          return [];
+        }
       };
-      return query;
+      const saveRows = (rows) => {
+        try {
+          localStorage.setItem(`am_mock_tbl_${tableName}`, JSON.stringify(rows));
+        } catch {}
+      };
+
+      let currentRows = getRows();
+      let pendingDelete = false;
+
+      const builder = {
+        select(_cols = "*") {
+          return builder;
+        },
+        insert(rowsToInsert) {
+          const toAdd = Array.isArray(rowsToInsert) ? rowsToInsert : [rowsToInsert];
+          const enriched = toAdd.map((r) => ({
+            id: r.id || `row_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            created_at: r.created_at || new Date().toISOString(),
+            ...r,
+          }));
+          const existing = getRows();
+          const updated = [...enriched, ...existing];
+          saveRows(updated);
+          return Promise.resolve({ data: enriched, error: null });
+        },
+        update(updates) {
+          return {
+            eq(col, val) {
+              const rows = getRows().map((r) => (r[col] === val ? { ...r, ...updates } : r));
+              saveRows(rows);
+              return Promise.resolve({ data: rows, error: null });
+            },
+          };
+        },
+        delete() {
+          pendingDelete = true;
+          return builder;
+        },
+        eq(col, val) {
+          if (pendingDelete) {
+            const before = getRows();
+            const filtered = before.filter((r) => r[col] !== val);
+            saveRows(filtered);
+            return Promise.resolve({ data: filtered, error: null });
+          }
+          currentRows = currentRows.filter((r) => r[col] === val);
+          return builder;
+        },
+        order(col = "created_at", { ascending = true } = {}) {
+          currentRows.sort((a, b) => {
+            const valA = a[col];
+            const valB = b[col];
+            if (valA === valB) return 0;
+            return ascending ? (valA > valB ? 1 : -1) : (valA < valB ? 1 : -1);
+          });
+          return builder;
+        },
+        single() {
+          return Promise.resolve({ data: currentRows[0] || null, error: null });
+        },
+        then(resolve) {
+          return Promise.resolve({ data: currentRows, error: null }).then(resolve);
+        },
+      };
+      return builder;
     },
   };
 }
@@ -184,5 +246,6 @@ if (isConfigured) {
   clientInstance = createMockSupabaseClient();
 }
 
+export const isSupabaseConfigured = isConfigured;
 export const supabase = clientInstance;
 

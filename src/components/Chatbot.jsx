@@ -21,6 +21,8 @@ import {
 import { useCart } from "../context/CartContext";
 import { useOrders } from "../context/OrdersContext";
 import { useVIPLoader } from "../context/LoadingContext";
+import { useAuth } from "../context/AuthContext";
+import { saveChatMessage, deleteChatSession } from "../lib/chatService";
 import { RESTAURANT_PHONE } from "../utils/whatsapp";
 
 // ============================================================
@@ -168,6 +170,12 @@ export default function Chatbot() {
   const { addToCart } = useCart();
   const { addOrder } = useOrders();
   const { triggerLoader } = useVIPLoader();
+  const authContext = useAuth();
+
+  const currentUser = authContext?.session?.user || null;
+  const customerName = currentUser?.user_metadata?.full_name || (currentUser?.email ? currentUser.email.split("@")[0] : "Guest Customer");
+  const customerEmail = currentUser?.email || "guest@customer";
+  const userId = currentUser?.id || null;
 
   // Save sessions to localStorage
   useEffect(() => {
@@ -223,6 +231,21 @@ export default function Chatbot() {
       if (idx >= fullText.length) {
         clearInterval(typewriterTimerRef.current);
         setTypewriterText("");
+
+        // Auto-save AI Shahi Host message to Supabase
+        saveChatMessage({
+          sessionId: currentChatId,
+          userId,
+          customerName,
+          customerEmail,
+          sender: "ai_host",
+          message: fullText,
+          metadata: {
+            dish: fullResponse.product?.name || null,
+            billTotal: fullResponse.bill?.grandTotal || null,
+          },
+        });
+
         setSessions((prev) =>
           prev.map((s) => {
             if (s.id === currentChatId) {
@@ -541,6 +564,16 @@ export default function Chatbot() {
     const userMsg = { id: "msg_" + Date.now(), from: "user", text };
     const updatedMessages = [...messages, userMsg];
 
+    // Auto-save customer message to Supabase
+    saveChatMessage({
+      sessionId: currentChatId,
+      userId,
+      customerName,
+      customerEmail,
+      sender: "customer",
+      message: text,
+    });
+
     setSessions((prev) =>
       prev.map((s) => {
         if (s.id === currentChatId) {
@@ -594,6 +627,9 @@ export default function Chatbot() {
   };
 
   const handleDeleteChat = (chatId) => {
+    // Delete from Supabase as well
+    deleteChatSession(chatId);
+
     if (sessions.length <= 1) {
       setSessions([
         {
