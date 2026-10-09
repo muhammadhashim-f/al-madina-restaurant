@@ -25,6 +25,7 @@ import Favorites from './components/Favorites';
 import ForgotPassword from './components/ForgotPassword';
 import Tracking from './components/Tracking';
 import Chatbot from './components/Chatbot';
+import NetworkSpeedLoader from './components/NetworkSpeedLoader';
 import AdminLogin from './components/AdminLogin';
 import AdminDashboard from './components/AdminDashboard';
 
@@ -45,6 +46,51 @@ function ScrollToHash() {
     } else if (!location.hash) {
       window.scrollTo(0, 0);
     }
+  }, [location]);
+
+  return null;
+}
+
+function ScrollWatcher() {
+  const location = useLocation();
+
+  useEffect(() => {
+    const observeTargets = () => {
+      const targets = document.querySelectorAll('.reveal-left, .reveal-right, .reveal-3d-up');
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('revealed');
+            } else {
+              const rect = entry.target.getBoundingClientRect();
+              if (rect.top > window.innerHeight * 1.05 || rect.bottom < -60) {
+                entry.target.classList.remove('revealed');
+              }
+            }
+          });
+        },
+        { threshold: 0.1, rootMargin: '0px 0px -30px 0px' }
+      );
+
+      targets.forEach((el) => {
+        const rect = el.getBoundingClientRect();
+        if (rect.top < window.innerHeight && rect.bottom > 0) {
+          el.classList.add('revealed');
+        }
+        observer.observe(el);
+      });
+
+      return observer;
+    };
+
+    const obs = observeTargets();
+    const timeout = setTimeout(observeTargets, 250);
+
+    return () => {
+      clearTimeout(timeout);
+      if (obs) obs.disconnect();
+    };
   }, [location]);
 
   return null;
@@ -73,6 +119,7 @@ function App() {
             <BrowserRouter>
               <Navbar />
               <ScrollToHash />
+              <ScrollWatcher />
               <Routes>
                 <Route path="/" element={<HomePage />} />
                 <Route path="/login" element={<Auth />} />
@@ -88,6 +135,7 @@ function App() {
                 <Route path="/admin/dashboard" element={<AdminDashboard />} />
               </Routes>
               <Chatbot />
+              <NetworkSpeedLoader />
               <Footer />
             </BrowserRouter>
           </ReviewsProvider>

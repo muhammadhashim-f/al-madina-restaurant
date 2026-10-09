@@ -39,7 +39,7 @@ function useCountdown(endsAt) {
   return { hours, minutes, seconds };
 }
 
-function OfferCard({ item }) {
+function OfferCard({ item, index = 0 }) {
   const { addToCart } = useCart();
   const countdown = useCountdown(item.endsAt);
   const isExpired = !countdown;
@@ -52,7 +52,9 @@ function OfferCard({ item }) {
   };
 
   return (
-    <div className={`am-offer-card ${isExpired ? "expired" : ""}`}>
+    <div
+      className={`am-offer-card card-3d ${index % 2 === 0 ? "reveal-left" : "reveal-right"} ${isExpired ? "expired" : ""}`}
+    >
       <div className="relative">
         <img src={item.image} alt={item.name} />
         <span className="am-offer-badge">
@@ -159,19 +161,19 @@ export default function Offers() {
         }
       `}</style>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="text-center mb-12">
-          <p className="text-xs font-medium uppercase mb-3" style={{ color: "#D4AF37", letterSpacing: "0.3em" }}>
-            Limited time
-          </p>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 perspective-container">
+        <div className="text-center mb-12 reveal-3d-up">
+          <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest bg-[#D4AF37]/15 border border-[#D4AF37]/40 text-[#F0DFA0] mb-3 glow-3d">
+            🔥 Khas Riwayati Bachat & VIP Deals
+          </span>
           <h2 className="am-offers-heading text-3xl sm:text-4xl font-bold">
-            Today's specials, while they last
+            Today's Royal Specials, While They Last
           </h2>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {OFFER_ITEMS.map((item) => (
-            <OfferCard key={item.id} item={item} />
+          {OFFER_ITEMS.map((item, index) => (
+            <OfferCard key={item.id} item={item} index={index} />
           ))}
         </div>
       </div>

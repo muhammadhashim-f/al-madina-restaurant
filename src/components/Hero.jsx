@@ -72,11 +72,12 @@ export default function Hero() {
 
       <div className="am-hero-bg-pattern" />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-28 relative">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-28 relative perspective-container">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-          {/* Left: copy */}
-          <div>
-            <p className="am-hero-eyebrow text-xs font-medium uppercase mb-4">
+          {/* Left: copy with 3D reveal from left */}
+          <div className="reveal-left">
+            <p className="am-hero-eyebrow text-xs font-semibold uppercase mb-4 inline-flex items-center gap-2 bg-[#D4AF37]/10 border border-[#D4AF37]/30 px-3.5 py-1.5 rounded-full">
+              <span className="w-2 h-2 rounded-full bg-[#D4AF37] animate-ping" />
               Est. in the heart of Karachi
             </p>
             <h1 className="am-hero-heading text-4xl sm:text-5xl lg:text-6xl font-bold mb-6">
@@ -89,26 +90,57 @@ export default function Hero() {
             >
               Traditional recipes, slow-cooked spices, and warm hospitality —
               Al Madina brings the authentic taste of home to your table,
-              whether you dine in or order for delivery.
+              whether you dine in or order for live bike delivery.
             </p>
             <div className="flex flex-wrap gap-4">
               <a
                 href="#menu"
-                className="am-btn-primary inline-flex items-center gap-2 px-7 py-3.5 rounded-md text-sm font-semibold"
+                className="am-btn-primary inline-flex items-center gap-2 px-7 py-3.5 rounded-xl text-sm font-bold shadow-xl hover:scale-105 transition-transform"
               >
                 <UtensilsCrossed size={18} />
                 Order now
               </a>
               <Link
                 to="/reservations"
-                className="am-btn-outline inline-flex items-center gap-2 px-7 py-3.5 rounded-md text-sm font-semibold"
+                className="am-btn-outline inline-flex items-center gap-2 px-7 py-3.5 rounded-xl text-sm font-semibold hover:scale-105 transition-transform"
               >
                 <CalendarCheck size={18} />
                 Reserve a table
               </Link>
             </div>
           </div>
-          <img src="../Images/Hero/Hero.jpg" alt="Restaurant" />
+
+          {/* Right: 3D Image Showcase with reveal from right & floating badges */}
+          <div className="relative reveal-right">
+            <div className="relative rounded-3xl overflow-hidden border border-[#D4AF37]/35 shadow-2xl card-3d">
+              <img
+                src="/Images/Hero/Hero.jpg"
+                alt="Al Madina Restaurant"
+                className="w-full h-[400px] lg:h-[480px] object-cover transition-transform duration-700 hover:scale-105"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+            </div>
+
+            {/* Floating 3D Badge 1: Live Bike GPS */}
+            <div className="absolute -bottom-6 -left-4 sm:left-4 z-20 bg-black/90 border border-[#D4AF37]/50 rounded-2xl p-3.5 shadow-2xl backdrop-blur-md flex items-center gap-3 animate-float-3d">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-lg">
+                🏍️
+              </div>
+              <div>
+                <p className="text-white text-xs font-bold">Live Bike Tracking</p>
+                <p className="text-[11px] text-white/50">OSRM Road GPS in Karachi</p>
+              </div>
+            </div>
+
+            {/* Floating 3D Badge 2: Authentic Biryani */}
+            <div className="absolute -top-4 -right-2 sm:right-6 z-20 bg-black/90 border border-[#D4AF37]/50 rounded-2xl p-3 shadow-2xl backdrop-blur-md flex items-center gap-2.5 animate-float-3d-reverse">
+              <span className="text-xl">🍛</span>
+              <div>
+                <p className="text-white text-xs font-bold">100% Authentic</p>
+                <p className="text-[10px] text-[#D4AF37]">Slow Cooked Spices</p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </section>

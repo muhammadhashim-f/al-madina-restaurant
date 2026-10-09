@@ -1,1 +1,117 @@
 @import "tailwindcss";
+
+/* ============================================================
+   AL MADINA RESTAURANT — 3D & SCROLL ANIMATION SUITE
+   Includes 3D perspective transforms, left & right scroll reveals,
+   card tilt, floating 3D culinary badges, and depth effects.
+   ============================================================ */
+
+/* 3D Perspective container */
+.perspective-container {
+  perspective: 1200px;
+  transform-style: preserve-3d;
+}
+
+/* Scroll Reveal: 3D Left entrance */
+.reveal-left {
+  opacity: 0;
+  transform: perspective(1200px) rotateY(-22deg) translateX(-80px) scale(0.95);
+  transition: opacity 0.85s cubic-bezier(0.16, 1, 0.3, 1), transform 0.85s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
+}
+
+.reveal-left.revealed {
+  opacity: 1;
+  transform: perspective(1200px) rotateY(0deg) translateX(0) scale(1);
+}
+
+/* Scroll Reveal: 3D Right entrance */
+.reveal-right {
+  opacity: 0;
+  transform: perspective(1200px) rotateY(22deg) translateX(80px) scale(0.95);
+  transition: opacity 0.85s cubic-bezier(0.16, 1, 0.3, 1), transform 0.85s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
+}
+
+.reveal-right.revealed {
+  opacity: 1;
+  transform: perspective(1200px) rotateY(0deg) translateX(0) scale(1);
+}
+
+/* Scroll Reveal: 3D Upward entrance */
+.reveal-3d-up {
+  opacity: 0;
+  transform: perspective(1200px) rotateX(20deg) translateY(60px) scale(0.94);
+  transition: opacity 0.85s cubic-bezier(0.16, 1, 0.3, 1), transform 0.85s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
+}
+
+.reveal-3d-up.revealed {
+  opacity: 1;
+  transform: perspective(1200px) rotateX(0deg) translateY(0) scale(1);
+}
+
+/* Interactive 3D Card Hover Tilt */
+.card-3d {
+  perspective: 1000px;
+  transform-style: preserve-3d;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s ease, border-color 0.4s ease;
+}
+
+.card-3d:hover {
+  transform: perspective(1000px) rotateX(6deg) rotateY(-5deg) translateY(-8px) scale(1.02);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 25px rgba(212, 175, 55, 0.28);
+  border-color: rgba(212, 175, 55, 0.65) !important;
+}
+
+.card-3d-alt {
+  perspective: 1000px;
+  transform-style: preserve-3d;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s ease, border-color 0.4s ease;
+}
+
+.card-3d-alt:hover {
+  transform: perspective(1000px) rotateX(6deg) rotateY(5deg) translateY(-8px) scale(1.02);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 25px rgba(212, 175, 55, 0.28);
+  border-color: rgba(212, 175, 55, 0.65) !important;
+}
+
+/* 3D Floating Animations */
+@keyframes float3D {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg) translateZ(10px);
+  }
+  50% {
+    transform: translateY(-12px) rotate(2deg) translateZ(25px);
+  }
+}
+
+@keyframes float3DReverse {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg) translateZ(10px);
+  }
+  50% {
+    transform: translateY(12px) rotate(-2deg) translateZ(25px);
+  }
+}
+
+@keyframes pulseGold3D {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(212, 175, 55, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 35px rgba(212, 175, 55, 0.55);
+  }
+}
+
+.animate-float-3d {
+  animation: float3D 4s ease-in-out infinite;
+}
+
+.animate-float-3d-reverse {
+  animation: float3DReverse 4.5s ease-in-out infinite;
+}
+
+.glow-3d {
+  animation: pulseGold3D 3s ease-in-out infinite;
+}

@@ -144,11 +144,16 @@ export default function Reservations() {
         }
       `}</style>
 
-      <div className="am-res-card">
-        <h1 className="am-res-heading text-2xl font-bold text-center mb-1">Reserve a table</h1>
-        <p className="text-center text-sm mb-7" style={{ color: "rgba(255,255,255,0.55)" }}>
-          We'll hold your table — just fill in the details below
-        </p>
+      <div className="am-res-card card-3d">
+        <div className="text-center mb-6">
+          <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest bg-[#D4AF37]/15 border border-[#D4AF37]/40 text-[#F0DFA0] mb-2 glow-3d">
+            🍽️ Shahi Dawat Booking — Table Mehfooz Farmayein
+          </span>
+          <h1 className="am-res-heading text-2xl sm:text-3xl font-bold">Reserve Your Royal Table</h1>
+          <p className="text-sm text-white/60 mt-1">
+            Hum aapke aur aapki family ke liye behtareen table mehfooz rakhenge
+          </p>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

@@ -9,11 +9,11 @@ import { X } from "lucide-react";
 // ============================================================
 
 const GALLERY_IMAGES = [
-  { id: 1, src: "../images/Gallery/Signature grilled platter.jpg", alt: "Signature grilled platter" },
-  { id: 2, src: "../images/Gallery/Restaurant dining area.webp", alt: "Restaurant dining area" },
-  { id: 3, src: "../images/Gallery/Chicken biryani.webp", alt: "Chicken biryani" },
-  { id: 4, src: "../images/Gallery/Table setting.webp", alt: "Table setting" },
-  { id: 5, src: "../images/Gallery/Mutton karahi.webp", alt: "Mutton karahi" },
+  { id: 1, src: "/Images/Gallery/Signature grilled platter.jpg", alt: "Signature grilled platter" },
+  { id: 2, src: "/Images/Gallery/Restaurant dining area.webp", alt: "Restaurant dining area" },
+  { id: 3, src: "/Images/Gallery/Chicken biryani.webp", alt: "Chicken biryani" },
+  { id: 4, src: "/Images/Gallery/Table setting.webp", alt: "Table setting" },
+  { id: 5, src: "/Images/Gallery/Mutton karahi.webp", alt: "Mutton karahi" },
 ];
 
 export default function Gallery() {
@@ -105,13 +105,13 @@ export default function Gallery() {
         }
       `}</style>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="text-center mb-12">
-          <p className="text-xs font-medium uppercase mb-3" style={{ color: "#D4AF37", letterSpacing: "0.3em" }}>
-            Gallery
-          </p>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 perspective-container">
+        <div className="text-center mb-12 reveal-3d-up">
+          <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest bg-[#D4AF37]/15 border border-[#D4AF37]/40 text-[#F0DFA0] mb-3 glow-3d">
+            📸 Shahi Mehmaan Nawazi & Karachi Dawat Ki Jhalak
+          </span>
           <h2 className="am-gallery-heading text-3xl sm:text-4xl font-bold">
-            A glimpse inside Al Madina
+            A Glimpse Inside Al Madina's Dining Hall
           </h2>
         </div>
 
@@ -119,7 +119,7 @@ export default function Gallery() {
           {GALLERY_IMAGES.map((img, i) => (
             <div
               key={img.id}
-              className="am-gallery-item"
+              className={`am-gallery-item card-3d ${i % 2 === 0 ? "reveal-left" : "reveal-right"}`}
               style={{ aspectRatio: i % 3 === 0 ? "4/5" : "4/4" }}
               onClick={() => setSelected(img)}
             >

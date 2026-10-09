@@ -28,12 +28,6 @@ const LEGAL_LINKS = [
   { label: "Refund policy", href: "#refund" },
 ];
 
-const HOURS = [
-  { day: "Monday - Thursday", time: "12:00 PM - 11:00 PM" },
-  { day: "Friday - Saturday", time: "12:00 PM - 1:00 AM" },
-  { day: "Sunday", time: "1:00 PM - 11:00 PM" },
-];
-
 export default function Footer() {
   const [email, setEmail] = useState("");
   const [subscribed, setSubscribed] = useState(false);

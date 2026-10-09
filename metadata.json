@@ -1,0 +1,8 @@
+{
+  "name": "Al Madina Restaurant",
+  "description": "Authentic Pakistani & Mughlai cuisine, featuring biryani, karahi, kebabs, online ordering, reservations, and live tracking.",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

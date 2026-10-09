@@ -91,11 +91,11 @@ export default function Testimonials() {
       `}</style>
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
-        <p className="text-xs font-medium uppercase mb-3" style={{ color: "#D4AF37", letterSpacing: "0.3em" }}>
-          Guest reviews
-        </p>
+        <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest bg-[#D4AF37]/15 border border-[#D4AF37]/40 text-[#F0DFA0] mb-3 glow-3d">
+          👑 Mehfil-e-Zaiqa — Muazzaz Mehmano Ki Raayein
+        </span>
         <h2 className="am-testi-heading text-3xl sm:text-4xl font-bold mb-12">
-          What our guests say
+          Heartfelt Words From Our Guests
         </h2>
 
         <div className="flex items-center justify-center gap-4 sm:gap-6">

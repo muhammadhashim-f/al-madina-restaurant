@@ -1,10 +1,11 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { Truck, Store, CreditCard, Wallet, CheckCircle2, ArrowLeft, Lock, Loader2 } from "lucide-react";
+import { Truck, Store, CreditCard, Wallet, CheckCircle2, ArrowLeft, Lock, Loader2, MessageSquare, MapPin } from "lucide-react";
 import { useCart } from "../context/CartContext";
 import { useOrders } from "../context/OrdersContext";
 import { useAuth } from "../context/AuthContext";
 import { geocodeAddress } from "../utils/geocode";
+import { getWhatsAppOrderUrl, RESTAURANT_PHONE } from "../utils/whatsapp";
 
 // ============================================================
 // AL MADINA RESTAURANT — Checkout Page
@@ -68,41 +69,81 @@ export default function Checkout() {
   };
 
   if (placedOrder) {
+    const waUrl = getWhatsAppOrderUrl(placedOrder);
+
     return (
       <section
-        className="w-full min-h-screen flex items-center justify-center px-4"
+        className="w-full min-h-screen flex items-center justify-center px-4 py-12"
         style={{ background: "linear-gradient(160deg, #0A0A0A 0%, #141414 60%, #0A0A0A 100%)" }}
       >
-        <div className="text-center max-w-md">
+        <div className="text-center max-w-lg w-full bg-black/40 border border-[#D4AF37]/30 p-8 rounded-2xl shadow-2xl backdrop-blur-md">
           <div
-            className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6"
-            style={{ background: "rgba(212,175,55,0.12)", border: "1px solid rgba(212,175,55,0.4)" }}
+            className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-5"
+            style={{ background: "rgba(212,175,55,0.15)", border: "1.5px solid rgba(212,175,55,0.5)" }}
           >
-            <CheckCircle2 size={26} style={{ color: "#D4AF37" }} />
+            <CheckCircle2 size={30} style={{ color: "#D4AF37" }} />
           </div>
-          <h2 className="text-2xl font-bold text-white mb-3" style={{ fontFamily: "'Amiri', serif" }}>
-            Order placed
+
+          <h2 className="text-3xl font-bold text-white mb-2" style={{ fontFamily: "'Amiri', serif" }}>
+            Order Placed Successfully!
           </h2>
-          <p className="text-sm mb-2" style={{ color: "rgba(255,255,255,0.65)" }}>
-            Order <span style={{ color: "#D4AF37" }}>#{placedOrder.id}</span> confirmed.
+          <p className="text-sm mb-4" style={{ color: "rgba(255,255,255,0.7)" }}>
+            Order ID: <span className="font-bold text-[#D4AF37]">#{placedOrder.id}</span> · Total: <span className="font-semibold text-white">Rs {placedOrder.total}</span>
           </p>
-          <p className="text-sm mb-7" style={{ color: "rgba(255,255,255,0.65)" }}>
-            {placedOrder.fulfillment === "delivery"
-              ? "We'll deliver it to your address soon."
-              : "It'll be ready for pickup shortly."}
-          </p>
-          <div className="flex gap-3 justify-center">
-            <Link to="/orders" className="am-co-btn px-6 py-2.5 rounded-md text-sm font-semibold">
-              View order history
+
+          {/* WhatsApp Direct Order Box */}
+          <div className="bg-[#25D366]/10 border border-[#25D366]/40 rounded-xl p-4 mb-6 text-left">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#25D366] animate-ping" />
+              <p className="text-[#25D366] text-xs font-bold uppercase tracking-wider">
+                Step 1: Confirm on WhatsApp
+              </p>
+            </div>
+            <p className="text-xs text-white/80 mb-3 leading-relaxed">
+              Order owner ko send karne ke liye WhatsApp button dabayein. Owner ({RESTAURANT_PHONE}) se baat hote hi delivery bike live track ho jayegi!
+            </p>
+            <a
+              href={waUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full inline-flex items-center justify-center gap-2.5 bg-[#25D366] hover:bg-[#1EBE5D] text-black font-bold py-3 px-5 rounded-lg text-sm transition-all shadow-lg hover:shadow-[#25D366]/30 hover:scale-[1.02]"
+            >
+              <MessageSquare size={18} />
+              Send Order to Owner on WhatsApp
+            </a>
+          </div>
+
+          {/* Delivery & Tracking Step */}
+          {placedOrder.fulfillment === "delivery" && (
+            <div className="bg-white/5 border border-white/10 rounded-xl p-4 mb-6 text-left">
+              <div className="flex items-center gap-2 mb-1.5">
+                <Truck size={16} className="text-[#D4AF37]" />
+                <p className="text-white text-xs font-bold uppercase tracking-wider">
+                  Step 2: Live Bike GPS Tracking
+                </p>
+              </div>
+              <p className="text-xs text-white/70 mb-3">
+                Jese hi owner order accept aur ready karega, map par chalti hui bike rider aapke ghar tak live track hogi!
+              </p>
+              <Link
+                to={`/track/${placedOrder.id}`}
+                className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-[#D4AF37] to-[#F0DFA0] text-black font-semibold py-2.5 px-4 rounded-lg text-sm hover:brightness-110 transition-all shadow-md"
+              >
+                <MapPin size={16} />
+                Open Live Tracking Map
+              </Link>
+            </div>
+          )}
+
+          <div className="flex gap-3 justify-center pt-2 border-t border-white/10">
+            <Link to="/orders" className="text-xs text-white/70 hover:text-white px-3 py-2">
+              View Order History
             </Link>
-            <Link to="/#menu" className="am-co-btn-outline px-6 py-2.5 rounded-md text-sm font-semibold">
-              Order more
+            <span className="text-white/20 self-center">|</span>
+            <Link to="/#menu" className="text-xs text-[#D4AF37] hover:underline px-3 py-2 font-medium">
+              Order More Items
             </Link>
           </div>
-          <style>{`
-            .am-co-btn { background: linear-gradient(135deg, #D4AF37, #F0DFA0); color: #0A0A0A; }
-            .am-co-btn-outline { border: 1.5px solid rgba(212,175,55,0.5); color: #FFFFFF; }
-          `}</style>
         </div>
       </section>
     );

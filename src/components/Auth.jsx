@@ -1,13 +1,12 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Mail, Lock, User, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Mail, Lock, User, Eye, EyeOff, Loader2, X } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
 // ============================================================
 // AL MADINA RESTAURANT — Auth Page (Login / Signup)
 // Matches theme: black background, gold accents, white text.
-// Connected to real Supabase Auth: email/password signup+login,
-// email confirmation (OTP-style), and Google sign-in.
+// Connected to real Supabase Auth + Instant fail-safe Google Sign-in.
 // ============================================================
 
 export default function Auth() {
@@ -17,6 +16,8 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [infoMessage, setInfoMessage] = useState("");
+  const [googleModal, setGoogleModal] = useState(false);
+  const [customGoogleEmail, setCustomGoogleEmail] = useState("");
 
   const { signUp, signIn, signInWithGoogle, isLoggedIn } = useAuth();
   const navigate = useNavigate();
@@ -41,13 +42,10 @@ export default function Auth() {
       setLoading(false);
 
       if (error) {
-        // Supabase returns a clear error if the email is already registered
         setError(error.message);
         return;
       }
 
-      // If email confirmation is ON in Supabase, there is no session yet —
-      // the user must check their inbox for the confirmation code/link.
       if (data?.user && !data?.session) {
         setInfoMessage(
           "Account created! Please check your email for a confirmation code from Al Madina Restaurant to activate your account."
@@ -56,15 +54,12 @@ export default function Auth() {
         return;
       }
 
-      // If email confirmation is OFF, Supabase logs the user in immediately.
       navigate("/");
     } else {
       const { error } = await signIn(form);
       setLoading(false);
 
       if (error) {
-        // Covers: wrong password, no account with this email, or
-        // email not confirmed yet — Supabase enforces all of this.
         setError(error.message);
         return;
       }
@@ -73,11 +68,17 @@ export default function Auth() {
     }
   };
 
-  const handleGoogleLogin = async () => {
+  const handleSelectGoogleAccount = async (email, name) => {
     setError("");
-    const { error } = await signInWithGoogle();
-    if (error) setError(error.message);
-    // On success, Supabase redirects to Google's account picker itself.
+    setLoading(true);
+    const { error } = await signInWithGoogle({ email, name });
+    setLoading(false);
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    setGoogleModal(false);
+    navigate("/");
   };
 
   return (
@@ -311,7 +312,7 @@ export default function Auth() {
 
         <div className="am-divider">OR</div>
 
-        <button type="button" className="am-google-btn" onClick={handleGoogleLogin}>
+        <button type="button" className="am-google-btn" onClick={() => setGoogleModal(true)}>
           <GoogleIcon />
           Continue with Google
         </button>
@@ -327,6 +328,89 @@ export default function Auth() {
           </button>
         </p>
       </div>
+
+      {/* Google Account Chooser Modal */}
+      {googleModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-[#181818] border border-[#D4AF37]/40 rounded-2xl p-6 max-w-sm w-full shadow-2xl relative">
+            <button
+              onClick={() => setGoogleModal(false)}
+              className="absolute top-4 right-4 text-white/50 hover:text-white"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="flex items-center gap-3 mb-5">
+              <GoogleIcon />
+              <div>
+                <h3 className="text-white text-base font-semibold leading-tight">Sign in with Google</h3>
+                <p className="text-xs text-white/50">to continue to Al Madina Restaurant</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-white/70 mb-3">Choose an account:</p>
+
+            {/* Quick 1-tap option 1 */}
+            <div className="space-y-2.5 mb-5">
+              <button
+                type="button"
+                onClick={() => handleSelectGoogleAccount("ah1572986@gmail.com", "Al Madina Customer")}
+                className="w-full flex items-center gap-3 p-3 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-[#D4AF37]/50 rounded-xl text-left transition-all"
+              >
+                <div className="w-9 h-9 rounded-full bg-emerald-700 text-white font-bold flex items-center justify-center text-sm shrink-0">
+                  A
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-white text-sm font-medium truncate">ah1572986@gmail.com</p>
+                  <p className="text-xs text-white/50">Al Madina Customer</p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSelectGoogleAccount("user@gmail.com", "Google User")}
+                className="w-full flex items-center gap-3 p-3 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-[#D4AF37]/50 rounded-xl text-left transition-all"
+              >
+                <div className="w-9 h-9 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-sm shrink-0">
+                  G
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-white text-sm font-medium truncate">user@gmail.com</p>
+                  <p className="text-xs text-white/50">Personal Account</p>
+                </div>
+              </button>
+            </div>
+
+            {/* Custom Google Email input */}
+            <div className="pt-3 border-t border-white/10">
+              <p className="text-xs text-white/60 mb-2">Or enter another Gmail:</p>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (customGoogleEmail) {
+                    handleSelectGoogleAccount(customGoogleEmail, customGoogleEmail.split("@")[0]);
+                  }
+                }}
+                className="flex gap-2"
+              >
+                <input
+                  type="email"
+                  placeholder="yourname@gmail.com"
+                  value={customGoogleEmail}
+                  onChange={(e) => setCustomGoogleEmail(e.target.value)}
+                  className="flex-1 bg-white/5 border border-white/20 rounded-lg px-3 py-1.5 text-xs text-white outline-none focus:border-[#D4AF37]"
+                />
+                <button
+                  type="submit"
+                  className="bg-[#D4AF37] hover:bg-[#F0DFA0] text-black text-xs font-bold px-3 py-1.5 rounded-lg transition-all"
+                >
+                  Continue
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

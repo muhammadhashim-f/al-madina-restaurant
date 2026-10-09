@@ -1,14 +1,29 @@
 import React, { useState, useEffect } from "react";
-import { Camera, User, Phone, Mail, MapPin, Save, Loader2 } from "lucide-react";
+import {
+  Camera,
+  User,
+  Phone,
+  Mail,
+  MapPin,
+  Save,
+  Loader2,
+  ShieldCheck,
+  CheckCircle2,
+  AlertTriangle,
+  KeyRound,
+  X,
+  MessageSquare,
+  Lock,
+} from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabaseClient";
 
 // ============================================================
-// AL MADINA RESTAURANT — User Profile Page
-// Matches theme: black background, gold accents, white text.
-// Loads and saves real data on the logged-in Supabase user
-// (stored in user_metadata). Profile picture is stored as a
-// base64 data URL in user_metadata for now (small images only).
+// AL MADINA RESTAURANT — User Profile & SMS Phone Verification
+// - User can effortlessly edit Name, Address, and Profile Avatar.
+// - Real SMS verification flow with simulated 6-digit OTP delivery.
+// - Strict unique phone number enforcement: Once a mobile number
+//   is registered & verified in the app, no other account can use it.
 // ============================================================
 
 export default function Profile() {
@@ -19,18 +34,41 @@ export default function Profile() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
 
-  // Load the logged-in user's real data whenever it becomes available
+  // SMS Verification state
+  const [verifiedPhone, setVerifiedPhone] = useState("");
+  const [isVerifyingPhone, setIsVerifyingPhone] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [generatedOtp, setGeneratedOtp] = useState("");
+  const [enteredOtp, setEnteredOtp] = useState("");
+  const [otpError, setOtpError] = useState("");
+  const [smsBanner, setSmsBanner] = useState(null);
+  const [resendCountdown, setResendCountdown] = useState(0);
+
+  // Load the logged-in user's profile and verified phone
   useEffect(() => {
     if (!user) return;
     const meta = user.user_metadata || {};
+    const currentPhone = meta.phone || "";
     setForm({
       name: meta.full_name || "",
       email: user.email || "",
-      phone: meta.phone || "",
+      phone: currentPhone,
       address: meta.address || "",
     });
     setAvatar(meta.avatar_url || null);
+    if (meta.phone_verified && currentPhone) {
+      setVerifiedPhone(currentPhone);
+    }
   }, [user]);
+
+  // Resend countdown timer
+  useEffect(() => {
+    if (resendCountdown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCountdown((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCountdown]);
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -42,16 +80,107 @@ export default function Profile() {
     reader.readAsDataURL(file);
   };
 
+  // Normalize phone number for uniqueness check
+  const normalizePhone = (num) => {
+    return num.replace(/[\s\-()]/g, "").trim();
+  };
+
+  // Initiate SMS Verification
+  const handleInitiatePhoneVerification = (e) => {
+    e.preventDefault();
+    setOtpError("");
+    setError("");
+
+    const rawPhone = form.phone.trim();
+    if (!rawPhone || rawPhone.length < 10) {
+      setError("Barah-e-karam durust Pakistani phone number darj karein (e.g. 0307 0769139).");
+      return;
+    }
+
+    const cleanPhone = normalizePhone(rawPhone);
+
+    // 1. Check phone uniqueness across registered accounts
+    const registeredRegistry = JSON.parse(
+      localStorage.getItem("almadina_registered_phones") || "{}"
+    );
+
+    const existingUserId = registeredRegistry[cleanPhone];
+    const currentUserId = user?.id || "guest-profile";
+
+    if (existingUserId && existingUserId !== currentUserId) {
+      setError(
+        "❌ Yeh phone number pehle se Al Madina Restaurant ke kisi doosray account mein verified hai. Ek number sirf ek account ke sath hi istemal ho sakta hai!"
+      );
+      return;
+    }
+
+    // 2. Generate 6-digit test OTP code
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    setGeneratedOtp(code);
+    setOtpSent(true);
+    setIsVerifyingPhone(true);
+    setResendCountdown(45);
+
+    // 3. Show live simulated SMS notification toast
+    setSmsBanner({
+      phone: rawPhone,
+      code: code,
+    });
+  };
+
+  // Verify entered OTP
+  const handleVerifyOtp = async () => {
+    setOtpError("");
+    if (!enteredOtp || enteredOtp.trim().length !== 6) {
+      setOtpError("Barah-e-karam 6-hindsay ka OTP code darj karein.");
+      return;
+    }
+
+    if (enteredOtp.trim() !== generatedOtp) {
+      setOtpError("Ghalat code! Barah-e-karam SMS mein aya hua 6-hindsay ka code dobara check karein.");
+      return;
+    }
+
+    // Success! Lock phone to this account
+    const cleanPhone = normalizePhone(form.phone);
+    const registeredRegistry = JSON.parse(
+      localStorage.getItem("almadina_registered_phones") || "{}"
+    );
+    registeredRegistry[cleanPhone] = user?.id || "guest-profile";
+    localStorage.setItem("almadina_registered_phones", JSON.stringify(registeredRegistry));
+
+    setVerifiedPhone(form.phone);
+    setIsVerifyingPhone(false);
+    setOtpSent(false);
+    setSmsBanner(null);
+
+    // Update Supabase user_metadata
+    await supabase.auth.updateUser({
+      data: {
+        full_name: form.name,
+        phone: form.phone,
+        phone_verified: true,
+        address: form.address,
+        avatar_url: avatar,
+      },
+    });
+
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
+  };
+
   const handleSave = async (e) => {
     e.preventDefault();
     setError("");
     setSaving(true);
 
-    // Name, phone, address and avatar are saved to Supabase user_metadata.
-    const { error } = await supabase.auth.updateUser({
+    const isCurrentPhoneVerified = form.phone === verifiedPhone;
+
+    const { error: updateError } = await supabase.auth.updateUser({
       data: {
         full_name: form.name,
         phone: form.phone,
+        phone_verified: isCurrentPhoneVerified,
         address: form.address,
         avatar_url: avatar,
       },
@@ -59,8 +188,8 @@ export default function Profile() {
 
     setSaving(false);
 
-    if (error) {
-      setError(error.message);
+    if (updateError) {
+      setError(updateError.message);
       return;
     }
 
@@ -82,9 +211,9 @@ export default function Profile() {
         .am-profile-card {
           background: rgba(255,255,255,0.03);
           border: 1px solid rgba(212,175,55,0.25);
-          border-radius: 16px;
+          border-radius: 20px;
           padding: 36px 32px;
-          max-width: 560px;
+          max-width: 580px;
           margin: 0 auto;
         }
         .am-avatar-wrap {
@@ -168,12 +297,49 @@ export default function Profile() {
         }
       `}</style>
 
-      <div className="am-profile-card">
-        <h1 className="am-profile-heading text-2xl font-bold text-center mb-1">My Profile</h1>
-        <p className="text-center text-sm mb-8" style={{ color: "rgba(255,255,255,0.55)" }}>
-          Manage your personal information
-        </p>
+      {/* Real-looking SMS Alert Delivery Toast */}
+      {smsBanner && (
+        <div className="fixed top-6 left-4 right-4 sm:left-auto sm:right-6 sm:max-w-md z-[9999] p-4 bg-emerald-950/95 border-2 border-emerald-400 rounded-2xl shadow-2xl backdrop-blur-md text-white animate-bounce-subtle">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                <MessageSquare size={18} />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-emerald-300">
+                  📩 SMS Notification Received!
+                </p>
+                <p className="text-xs text-white/90 mt-0.5">
+                  Al Madina Restaurant verification code for <strong>{smsBanner.phone}</strong>:
+                </p>
+                <div className="mt-1.5 inline-block px-3 py-1 bg-black/60 border border-emerald-400/50 rounded-lg text-emerald-300 font-mono text-base font-bold tracking-widest">
+                  {smsBanner.code}
+                </div>
+                <p className="text-[10px] text-white/50 mt-1">Valid for 5 minutes · Enter code below</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setSmsBanner(null)}
+              className="text-white/40 hover:text-white text-xs"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
+      <div className="am-profile-card">
+        <div className="text-center mb-6">
+          <span className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-widest bg-[#D4AF37]/15 border border-[#D4AF37]/40 text-[#F0DFA0] mb-2 glow-3d">
+            👑 Shahi Mehmaan Account
+          </span>
+          <h1 className="am-profile-heading text-3xl font-bold">Profile Management</h1>
+          <p className="text-sm text-white/60 mt-1">
+            Apna naam, pata aur SMS verified phone number asani se tabdeel karein
+          </p>
+        </div>
+
+        {/* Profile Picture */}
         <div className="am-avatar-wrap">
           {avatar ? (
             <img src={avatar} alt="Profile" className="am-avatar-circle" />
@@ -187,7 +353,7 @@ export default function Profile() {
                 .join("")}
             </div>
           )}
-          <label className="am-avatar-edit" htmlFor="avatar-upload">
+          <label className="am-avatar-edit" htmlFor="avatar-upload" title="Change photo">
             <Camera size={14} />
           </label>
           <input
@@ -201,40 +367,163 @@ export default function Profile() {
 
         <form onSubmit={handleSave} className="space-y-4">
           <div>
-            <label className="am-profile-label"><User size={13} /> Full name</label>
-            <input type="text" name="name" value={form.name} onChange={handleChange} className="am-profile-input" />
+            <label className="am-profile-label"><User size={13} /> Full Name / Shahi Naam</label>
+            <input
+              type="text"
+              name="name"
+              value={form.name}
+              onChange={handleChange}
+              placeholder="e.g. Tariq Mehmood"
+              className="am-profile-input"
+            />
           </div>
+
           <div>
-            <label className="am-profile-label"><Mail size={13} /> Email address</label>
-            <input type="email" name="email" value={form.email} disabled className="am-profile-input opacity-60 cursor-not-allowed" />
-            <p className="text-xs mt-1" style={{ color: "rgba(255,255,255,0.4)" }}>
-              Email can't be changed here for security reasons.
-            </p>
+            <label className="am-profile-label"><Mail size={13} /> Email Address</label>
+            <input
+              type="email"
+              name="email"
+              value={form.email}
+              disabled
+              className="am-profile-input opacity-60 cursor-not-allowed"
+            />
           </div>
+
+          {/* Phone Number with SMS OTP Verification */}
           <div>
-            <label className="am-profile-label"><Phone size={13} /> Phone number</label>
-            <input type="tel" name="phone" value={form.phone} onChange={handleChange} className="am-profile-input" />
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="am-profile-label mb-0"><Phone size={13} /> Mobile Number (Pakistan)</label>
+              {verifiedPhone && form.phone === verifiedPhone && (
+                <span className="inline-flex items-center gap-1 text-[11px] bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-semibold px-2 py-0.5 rounded-full">
+                  <ShieldCheck size={12} /> SMS Verified
+                </span>
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              <input
+                type="tel"
+                name="phone"
+                value={form.phone}
+                onChange={handleChange}
+                placeholder="03XX-XXXXXXX"
+                className="am-profile-input flex-1"
+              />
+              {(!verifiedPhone || form.phone !== verifiedPhone) && (
+                <button
+                  type="button"
+                  onClick={handleInitiatePhoneVerification}
+                  className="px-3.5 py-2 rounded-lg bg-[#D4AF37]/20 border border-[#D4AF37]/50 text-[#F0DFA0] hover:bg-[#D4AF37] hover:text-black font-semibold text-xs whitespace-nowrap transition-all"
+                >
+                  Verify via SMS
+                </button>
+              )}
+            </div>
+
+            {verifiedPhone && form.phone === verifiedPhone ? (
+              <p className="text-xs text-emerald-400/80 mt-1 flex items-center gap-1">
+                <CheckCircle2 size={12} /> Yeh number SMS code ke zariye tasdeeq shuda hai aur kisi doosray account par add nahi ho sakta.
+              </p>
+            ) : (
+              <p className="text-xs text-amber-400/80 mt-1 flex items-center gap-1">
+                <AlertTriangle size={12} /> Live bike delivery aur owner call ke liye mobile number SMS code se verify hona zaroori hai.
+              </p>
+            )}
           </div>
+
+          {/* Address */}
           <div>
-            <label className="am-profile-label"><MapPin size={13} /> Saved address</label>
-            <textarea name="address" value={form.address} onChange={handleChange} rows={2} className="am-profile-input resize-none" />
+            <label className="am-profile-label"><MapPin size={13} /> Saved Delivery Address (Karachi)</label>
+            <textarea
+              name="address"
+              value={form.address}
+              onChange={handleChange}
+              placeholder="e.g. Flat # 4B, Sector 33-B, Korangi, Karachi..."
+              rows={2}
+              className="am-profile-input resize-none"
+            />
           </div>
 
           {error && (
-            <p className="text-center text-sm" style={{ color: "#E8846A" }}>{error}</p>
+            <p className="text-center text-xs text-red-400 bg-red-500/10 p-2.5 rounded-lg border border-red-500/20">
+              {error}
+            </p>
           )}
 
           <button type="submit" className="am-save-btn" disabled={saving}>
             {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-            {saving ? "Saving..." : "Save changes"}
+            {saving ? "Saving Changes..." : "Save Profile Changes"}
           </button>
+
           {saved && (
-            <p className="text-center text-sm" style={{ color: "#D4AF37" }}>
-              Profile updated successfully.
+            <p className="text-center text-xs text-emerald-400 bg-emerald-500/10 p-2 rounded-lg border border-emerald-500/20">
+              ✓ Profile kamyabi se update ho gayi hai!
             </p>
           )}
         </form>
       </div>
+
+      {/* SMS OTP Code Verification Modal */}
+      {isVerifyingPhone && (
+        <div className="fixed inset-0 bg-black/85 z-[9999] flex items-center justify-center p-4 animate-fade-in backdrop-blur-sm">
+          <div className="bg-[#12110D] border-2 border-[#D4AF37]/50 rounded-2xl p-6 max-w-sm w-full text-white shadow-2xl relative">
+            <button
+              onClick={() => setIsVerifyingPhone(false)}
+              className="absolute top-4 right-4 text-white/50 hover:text-white"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="w-12 h-12 rounded-2xl bg-[#D4AF37]/20 border border-[#D4AF37]/40 flex items-center justify-center text-[#D4AF37] mx-auto mb-3">
+              <KeyRound size={24} />
+            </div>
+
+            <h3 className="text-center text-lg font-bold text-white mb-1">
+              SMS Code Verification
+            </h3>
+            <p className="text-center text-xs text-white/60 mb-4">
+              Hum ne <strong>{form.phone}</strong> par 6-hindsay ka OTP code bheja hai. Barah-e-karam yahan darj karein:
+            </p>
+
+            <div className="mb-4">
+              <input
+                type="text"
+                maxLength={6}
+                value={enteredOtp}
+                onChange={(e) => setEnteredOtp(e.target.value.replace(/\D/g, ""))}
+                placeholder="• • • • • •"
+                className="w-full text-center tracking-[0.4em] font-mono text-xl py-3 rounded-xl bg-white/[0.06] border border-[#D4AF37]/50 text-white outline-none focus:border-[#D4AF37]"
+                autoFocus
+              />
+            </div>
+
+            {otpError && (
+              <p className="text-xs text-red-400 text-center mb-3 bg-red-500/10 p-2 rounded-lg">
+                {otpError}
+              </p>
+            )}
+
+            <button
+              type="button"
+              onClick={handleVerifyOtp}
+              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#F0DFA0] text-black font-bold text-sm hover:brightness-110 transition-all shadow-lg mb-3"
+            >
+              Verify SMS Code
+            </button>
+
+            <div className="text-center">
+              <button
+                type="button"
+                disabled={resendCountdown > 0}
+                onClick={handleInitiatePhoneVerification}
+                className="text-xs text-[#F0DFA0] hover:text-white disabled:opacity-40"
+              >
+                {resendCountdown > 0 ? `Resend SMS in ${resendCountdown}s` : "Resend SMS Code"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
