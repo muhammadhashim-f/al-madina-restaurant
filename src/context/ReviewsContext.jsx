@@ -39,13 +39,23 @@ export function ReviewsProvider({ children }) {
     setReviews((prev) => [newReview, ...prev]);
   };
 
+  const updateReview = (id, updatedFields) => {
+    setReviews((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, ...updatedFields } : r))
+    );
+  };
+
+  const deleteReview = (id) => {
+    setReviews((prev) => prev.filter((r) => r.id !== id));
+  };
+
   const averageRating =
     reviews.length > 0
       ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
       : 0;
 
   return (
-    <ReviewsContext.Provider value={{ reviews, addReview, averageRating }}>
+    <ReviewsContext.Provider value={{ reviews, addReview, updateReview, deleteReview, averageRating }}>
       {children}
     </ReviewsContext.Provider>
   );

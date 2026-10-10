@@ -6,6 +6,7 @@ import { OrdersProvider } from './context/OrdersContext';
 import { FavoritesProvider } from './context/FavoritesContext';
 import { ReviewsProvider } from './context/ReviewsContext';
 import { LoadingProvider } from './context/LoadingContext';
+import { PolicyProvider } from './context/PolicyContext';
 
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
@@ -119,29 +120,31 @@ function App() {
         <OrdersProvider>
           <FavoritesProvider>
             <ReviewsProvider>
-              <BrowserRouter>
-                <ScrollProgressBar />
-                <Navbar />
-                <ScrollToHash />
-                <ScrollWatcher />
-                <Routes>
-                  <Route path="/" element={<HomePage />} />
-                  <Route path="/login" element={<Auth />} />
-                  <Route path="/reservations" element={<Reservations />} />
-                  <Route path="/cart" element={<Cart />} />
-                  <Route path="/checkout" element={<Checkout />} />
-                  <Route path="/orders" element={<OrderHistory />} />
-                  <Route path="/profile" element={<Profile />} />
-                  <Route path="/favorites" element={<Favorites />} />
-                  <Route path="/forgot-password" element={<ForgotPassword />} />
-                  <Route path="/track/:orderId" element={<Tracking />} />
-                  <Route path="/admin/login" element={<AdminLogin />} />
-                  <Route path="/admin/dashboard" element={<AdminDashboard />} />
-                </Routes>
-                <Chatbot />
-                <NetworkSpeedLoader />
-                <Footer />
-              </BrowserRouter>
+              <PolicyProvider>
+                <BrowserRouter>
+                  <ScrollProgressBar />
+                  <Navbar />
+                  <ScrollToHash />
+                  <ScrollWatcher />
+                  <Routes>
+                    <Route path="/" element={<HomePage />} />
+                    <Route path="/login" element={<Auth />} />
+                    <Route path="/reservations" element={<Reservations />} />
+                    <Route path="/cart" element={<Cart />} />
+                    <Route path="/checkout" element={<Checkout />} />
+                    <Route path="/orders" element={<OrderHistory />} />
+                    <Route path="/profile" element={<Profile />} />
+                    <Route path="/favorites" element={<Favorites />} />
+                    <Route path="/forgot-password" element={<ForgotPassword />} />
+                    <Route path="/track/:orderId" element={<Tracking />} />
+                    <Route path="/admin/login" element={<AdminLogin />} />
+                    <Route path="/admin/dashboard" element={<AdminDashboard />} />
+                  </Routes>
+                  <Chatbot />
+                  <NetworkSpeedLoader />
+                  <Footer />
+                </BrowserRouter>
+              </PolicyProvider>
             </ReviewsProvider>
           </FavoritesProvider>
         </OrdersProvider>

@@ -42,9 +42,23 @@ export default function Navbar() {
   const navigate = useNavigate();
 
   const handleSearch = (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     if (!searchQuery.trim()) return;
     navigate(`/?search=${encodeURIComponent(searchQuery.trim())}#menu`);
+  };
+
+  const handleSearchMouseLeave = () => {
+    // If user has not typed any text, collapse back to search icon
+    // If text is written, keep it expanded ("bara hi khara rahe")
+    if (!searchQuery.trim()) {
+      setSearchOpen(false);
+    }
+  };
+
+  const handleSearchBlur = () => {
+    if (!searchQuery.trim()) {
+      setSearchOpen(false);
+    }
   };
 
   const { user, isLoggedIn, signOut } = useAuth();
@@ -312,12 +326,22 @@ export default function Navbar() {
             {/* Right side actions */}
             <div className="hidden md:flex items-center gap-3">
               {/* Search */}
-              <form onSubmit={handleSearch} className={`am-search-wrap ${searchOpen ? "open" : "closed"}`}>
+              <form
+                onSubmit={handleSearch}
+                onMouseLeave={handleSearchMouseLeave}
+                className={`am-search-wrap ${searchOpen ? "open" : "closed"}`}
+              >
                 <button
                   type="button"
                   aria-label="Toggle search"
-                  onClick={() => searchOpen ? handleSearch({ preventDefault: () => {} }) : setSearchOpen(true)}
-                  className="p-2 shrink-0"
+                  onClick={() => {
+                    if (searchOpen && searchQuery.trim()) {
+                      handleSearch();
+                    } else {
+                      setSearchOpen(!searchOpen);
+                    }
+                  }}
+                  className="p-2 shrink-0 cursor-pointer"
                 >
                   <Search size={19} className="am-white" />
                 </button>
@@ -327,6 +351,7 @@ export default function Navbar() {
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
+                    onBlur={handleSearchBlur}
                     placeholder="Search dishes... (Enter)"
                     className="am-search-input"
                   />

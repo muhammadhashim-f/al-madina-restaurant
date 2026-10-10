@@ -15,22 +15,39 @@ import {
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useVIPLoader } from "../context/LoadingContext";
+import { usePolicy } from "../context/PolicyContext";
 
 // ============================================================
 // AL MADINA RESTAURANT — High Security Auth (Login / Signup)
 // Features:
 // - Live Password Strength Meter (Weak, Medium, Strong, Bulletproof)
 // - Real-time password hints (Length 8+, Uppercase, Lowercase, Number, Symbol)
-// - Pakistani phone number support & Confirm Password verification
-// - Terms of service & Halal culinary pledge agreement
+// - International / Pakistani phone number support with Country Selector
+// - Dynamic country placeholder formatting
+// - Terms of service & Halal culinary pledge interactive policy viewer
 // - VIP Loader transition
 // - Google Sign-in fail-safe
 // ============================================================
+
+export const COUNTRIES = [
+  { code: "PK", name: "Pakistan", dialCode: "+92", flag: "🇵🇰", placeholder: "0307-0769139", example: "0307-0769139" },
+  { code: "AE", name: "UAE", dialCode: "+971", flag: "🇦🇪", placeholder: "050 123 4567", example: "050 123 4567" },
+  { code: "SA", name: "Saudi Arabia", dialCode: "+966", flag: "🇸🇦", placeholder: "050 123 4567", example: "050 123 4567" },
+  { code: "GB", name: "United Kingdom", dialCode: "+44", flag: "🇬🇧", placeholder: "07123 456789", example: "07123 456789" },
+  { code: "US", name: "United States", dialCode: "+1", flag: "🇺🇸", placeholder: "(555) 012-3456", example: "(555) 012-3456" },
+  { code: "CA", name: "Canada", dialCode: "+1", flag: "🇨🇦", placeholder: "(555) 012-3456", example: "(555) 012-3456" },
+  { code: "OM", name: "Oman", dialCode: "+968", flag: "🇴🇲", placeholder: "9123 4567", example: "9123 4567" },
+  { code: "QA", name: "Qatar", dialCode: "+974", flag: "🇶🇦", placeholder: "3312 3456", example: "3312 3456" },
+  { code: "KW", name: "Kuwait", dialCode: "+965", flag: "🇰🇼", placeholder: "5123 4567", example: "5123 4567" },
+  { code: "BH", name: "Bahrain", dialCode: "+973", flag: "🇧🇭", placeholder: "3612 3456", example: "3612 3456" },
+  { code: "AU", name: "Australia", dialCode: "+61", flag: "🇦🇺", placeholder: "0412 345 678", example: "0412 345 678" },
+];
 
 export default function Auth() {
   const [mode, setMode] = useState("login"); // "login" | "signup"
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0]);
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -47,6 +64,7 @@ export default function Auth() {
 
   const { signUp, signIn, signInWithGoogle, isLoggedIn } = useAuth();
   const { triggerLoader } = useVIPLoader();
+  const { openPolicy } = usePolicy();
   const navigate = useNavigate();
 
   React.useEffect(() => {
@@ -116,10 +134,14 @@ export default function Auth() {
     setLoading(true);
 
     if (mode === "signup") {
+      const fullPhone = form.phone.startsWith("+")
+        ? form.phone
+        : `${selectedCountry.dialCode} ${form.phone}`;
+
       const { data, error } = await signUp({
         name: form.name,
         email: form.email,
-        phone: form.phone,
+        phone: fullPhone,
         password: form.password,
       });
 
@@ -392,23 +414,45 @@ export default function Auth() {
                   name="name"
                   value={form.name}
                   onChange={handleChange}
-                  placeholder="Full Name (Aapka Poora Naam)"
+                  placeholder="Hakim Bhai"
                   className="am-auth-input"
                   required
                 />
               </div>
 
-              <div className="am-auth-input-wrap">
-                <Phone size={16} className="leading" />
-                <input
-                  type="tel"
-                  name="phone"
-                  value={form.phone}
-                  onChange={handleChange}
-                  placeholder="Phone Number (e.g. 0300-1234567)"
-                  className="am-auth-input"
-                  required
-                />
+              {/* Country Code & Phone Input */}
+              <div className="flex gap-2 mb-4">
+                <div className="relative shrink-0 w-28 sm:w-32">
+                  <select
+                    value={selectedCountry.code}
+                    onChange={(e) => {
+                      const found = COUNTRIES.find((c) => c.code === e.target.value) || COUNTRIES[0];
+                      setSelectedCountry(found);
+                    }}
+                    className="w-full h-[46px] bg-[#111111] border border-white/15 focus:border-[#D4AF37] rounded-xl px-2.5 text-xs text-white focus:outline-none cursor-pointer appearance-none"
+                  >
+                    {COUNTRIES.map((c) => (
+                      <option key={c.code} value={c.code} className="bg-[#111111] text-white">
+                        {c.flag} {c.dialCode}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-white/40 text-[10px]">
+                    ▼
+                  </span>
+                </div>
+                <div className="am-auth-input-wrap flex-1 !mb-0">
+                  <Phone size={16} className="leading" />
+                  <input
+                    type="tel"
+                    name="phone"
+                    value={form.phone}
+                    onChange={handleChange}
+                    placeholder={selectedCountry.placeholder}
+                    className="am-auth-input"
+                    required
+                  />
+                </div>
               </div>
             </>
           )}
@@ -420,7 +464,7 @@ export default function Auth() {
               name="email"
               value={form.email}
               onChange={handleChange}
-              placeholder="Email address (e.g. name@example.com)"
+              placeholder="info@almadina.pk"
               className="am-auth-input"
               required
             />
@@ -505,20 +549,43 @@ export default function Auth() {
 
           {/* Terms & Conditions Checkbox */}
           {mode === "signup" && (
-            <label className="flex items-start gap-2.5 text-xs text-white/70 mb-4 cursor-pointer select-none">
+            <div className="flex items-start gap-2.5 text-xs text-white/70 mb-4 select-none">
               <input
                 type="checkbox"
+                id="agreeTerms"
                 name="agreeTerms"
                 checked={form.agreeTerms}
                 onChange={handleChange}
-                className="mt-0.5 accent-[#D4AF37] rounded"
+                className="mt-0.5 accent-[#D4AF37] rounded cursor-pointer shrink-0"
               />
-              <span>
+              <label htmlFor="agreeTerms" className="cursor-pointer leading-relaxed">
                 Main Al Madina Restaurant ki{" "}
-                <span className="text-[#D4AF37] underline">Security Policy</span> aur{" "}
-                <span className="text-[#D4AF37] underline">Halal Dining Rules</span> se ittefaq karta hoon.
-              </span>
-            </label>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openPolicy("security");
+                  }}
+                  className="text-[#D4AF37] underline font-semibold hover:text-[#F0DFA0] inline cursor-pointer"
+                >
+                  Security Policy
+                </button>{" "}
+                aur{" "}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openPolicy("halal");
+                  }}
+                  className="text-[#D4AF37] underline font-semibold hover:text-[#F0DFA0] inline cursor-pointer"
+                >
+                  Halal Dining Rules
+                </button>{" "}
+                se ittefaq karta hoon.
+              </label>
+            </div>
           )}
 
           {mode === "login" && (

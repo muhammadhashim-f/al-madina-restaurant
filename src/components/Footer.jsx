@@ -6,6 +6,7 @@ import {
   Clock,
   Send,
 } from "lucide-react";
+import { usePolicy } from "../context/PolicyContext";
 
 // ============================================================
 // AL MADINA RESTAURANT — Footer
@@ -23,14 +24,17 @@ const QUICK_LINKS = [
 ];
 
 const LEGAL_LINKS = [
-  { label: "Privacy policy", href: "#privacy" },
-  { label: "Terms of service", href: "#terms" },
-  { label: "Refund policy", href: "#refund" },
+  { label: "Privacy policy", type: "privacy" },
+  { label: "Terms of service", type: "terms" },
+  { label: "Refund policy", type: "refund" },
+  { label: "Security policy", type: "security" },
+  { label: "Halal Dining Rules", type: "halal" },
 ];
 
 export default function Footer() {
   const [email, setEmail] = useState("");
   const [subscribed, setSubscribed] = useState(false);
+  const { openPolicy } = usePolicy();
 
   const handleSubscribe = (e) => {
     e.preventDefault();
@@ -217,7 +221,7 @@ export default function Footer() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Your email address"
+                  placeholder="info@almadina.pk"
                   className="am-newsletter-input"
                   required
                 />
@@ -243,7 +247,7 @@ export default function Footer() {
               </p>
             </div>
             <a
-              href="mailto:owner@almadinarestaurant.pk"
+              href="mailto:almadinarestaurant@gmail.com"
               className="text-sm font-medium"
               style={{ color: "#D4AF37" }}
             >
@@ -256,11 +260,16 @@ export default function Footer() {
             <p className="text-xs" style={{ color: "rgba(255,255,255,0.55)" }}>
               &copy; {new Date().getFullYear()} Al Madina Restaurant. All rights reserved.
             </p>
-            <div className="flex gap-5">
+            <div className="flex gap-4 flex-wrap justify-center">
               {LEGAL_LINKS.map((link) => (
-                <a key={link.label} href={link.href} className="am-footer-link text-xs">
+                <button
+                  key={link.label}
+                  type="button"
+                  onClick={() => openPolicy(link.type)}
+                  className="am-footer-link text-xs cursor-pointer hover:text-[#D4AF37] transition-colors"
+                >
                   {link.label}
-                </a>
+                </button>
               ))}
             </div>
             <p className="text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>
