@@ -39,15 +39,16 @@ export function CartProvider({ children }) {
     } catch {}
   }, [items]);
 
-  const addToCart = (item) => {
+  const addToCart = (item, qty = 1) => {
+    const addAmount = Math.max(1, Number(qty) || 1);
     setItems((prev) => {
       const existing = prev.find((i) => i.id === item.id);
       if (existing) {
         return prev.map((i) =>
-          i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
+          i.id === item.id ? { ...i, quantity: i.quantity + addAmount } : i
         );
       }
-      return [...prev, { ...item, quantity: 1 }];
+      return [...prev, { ...item, quantity: addAmount }];
     });
   };
 
