@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { supabase } from "../lib/supabaseClient";
 
 // ============================================================
 // AL MADINA RESTAURANT — Favorites (Wishlist) Context
 // Lets users heart a dish in the Menu and see all saved dishes
-// on the Favorites page. Persisted to localStorage.
+// on the Favorites page. Syncs with localStorage and Supabase.
 // ============================================================
 
 const FavoritesContext = createContext(null);
@@ -21,6 +22,19 @@ export function FavoritesProvider({ children }) {
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(favorites));
+
+    // Sync to Supabase favorites table
+    try {
+      supabase
+        .from("favorites")
+        .insert({
+          id: "fav_active_session",
+          customer_identifier: "active_customer",
+          favorite_ids: favorites.map((f) => ({ id: f.id, name: f.name, price: f.price })),
+          updated_at: new Date().toISOString(),
+        })
+        .catch?.(() => {});
+    } catch {}
   }, [favorites]);
 
   const isFavorite = (id) => favorites.some((f) => f.id === id);

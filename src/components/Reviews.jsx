@@ -325,7 +325,7 @@ export default function Reviews() {
                 <label className="text-[11px] text-white/70 block mb-1">Aapka Naam / ID</label>
                 <input
                   type="text"
-                  placeholder="e.g. Tariq Mehmood"
+                  placeholder="Hakim Bhai"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   className="am-rev-input"

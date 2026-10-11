@@ -20,8 +20,28 @@ import {
   CheckCircle,
   AlertTriangle,
   Sparkles,
+  Star,
+  Heart,
+  ShoppingCart,
+  Edit3,
+  Plus,
+  Settings,
+  Phone,
+  Mail,
+  MapPin,
+  Clock,
+  Save,
+  X,
+  Users,
+  ChevronDown,
+  ChevronUp,
+  List,
+  Columns,
 } from "lucide-react";
 import { useOrders } from "../context/OrdersContext";
+import { useReviews } from "../context/ReviewsContext";
+import { useCart } from "../context/CartContext";
+import { useFavorites } from "../context/FavoritesContext";
 import {
   fetchCustomerChats,
   deleteChatSession,
@@ -35,24 +55,65 @@ import { isSupabaseConfigured } from "../lib/supabaseClient";
 
 // ============================================================
 // AL MADINA RESTAURANT — Admin Dashboard
-// Owner panel: Orders, Live GPS Dispatch, and Customer AI Chats (Supabase)
+// Owner panel:
+// 1. Orders & Live Dispatch (Orders, Status, Bike GPS, Delete)
+// 2. Customer AI Chats (Supabase real-time sync & deletion)
+// 3. Customer Reviews Moderation (View, Edit, Delete, Add Reviews)
+// 4. Customer Profiles, Carts & Favorites (What dishes in cart & favorites)
+// 5. Website Settings (Phone 03070769139, Email, Address, Delivery Fee, Banner)
 // ============================================================
 
 function isAdminLoggedIn() {
   return sessionStorage.getItem("am_admin_session") === "true";
 }
 
-export default function AdminDashboard() {
-  const { orders, updateOrderStatus } = useOrders();
+const DEFAULT_SETTINGS = {
+  restaurantName: "Al Madina Restaurant",
+  phone: "03070769139",
+  email: "almadinarestaurant@gmail.com",
+  address: "Near Bilal Chowk, Sector 36-B, Korangi, Karachi",
+  deliveryFee: 150,
+  minOrder: 500,
+  openingHours: "12:00 PM – 12:00 AM (Daily)",
+  announcement: "🌙 100% Desi Ghee Handi & Zabihah Halal Mutton. 30-45 Mins Live GPS Delivery in Karachi.",
+};
 
-  const [activeTab, setActiveTab] = useState("orders"); // "orders" | "chats"
+export default function AdminDashboard() {
+  const { orders, updateOrderStatus, deleteOrder } = useOrders();
+  const { reviews, addReview, updateReview, deleteReview, averageRating } = useReviews();
+  const { items: globalCartItems } = useCart();
+  const { favorites: globalFavorites } = useFavorites();
+
+  const [activeTab, setActiveTab] = useState("orders"); // "orders" | "chats" | "reviews" | "customers" | "settings"
   const [rawChats, setRawChats] = useState([]);
   const [chatsLoading, setChatsLoading] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState(null);
   const [chatSearch, setChatSearch] = useState("");
   const [showSqlModal, setShowSqlModal] = useState(false);
   const [copiedSql, setCopiedSql] = useState(false);
-  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [chatViewMode, setChatViewMode] = useState("split"); // "split" | "all_table"
+  const [expandedCardId, setExpandedCardId] = useState(null);
+  const [copiedMsgId, setCopiedMsgId] = useState(null);
+
+  // Review Edit & Add State
+  const [editingReview, setEditingReview] = useState(null);
+  const [reviewForm, setReviewForm] = useState({ name: "", rating: 5, comment: "" });
+  const [showAddReviewModal, setShowAddReviewModal] = useState(false);
+  const [reviewSearch, setReviewSearch] = useState("");
+
+  // Customer Activity Search
+  const [customerSearch, setCustomerSearch] = useState("");
+
+  // Website Settings State
+  const [siteSettings, setSiteSettings] = useState(() => {
+    try {
+      const saved = localStorage.getItem("am_website_settings");
+      return saved ? { ...DEFAULT_SETTINGS, ...JSON.parse(saved) } : DEFAULT_SETTINGS;
+    } catch {
+      return DEFAULT_SETTINGS;
+    }
+  });
+  const [settingsSaved, setSettingsSaved] = useState(false);
 
   const loadChats = async () => {
     setChatsLoading(true);
@@ -84,6 +145,42 @@ export default function AdminDashboard() {
       s.messages.some((m) => m.message.toLowerCase().includes(q))
     );
   });
+
+  const filteredFlatMessages = useMemo(() => {
+    const q = chatSearch.toLowerCase();
+    return (rawChats || []).filter((m) => {
+      if (!q) return true;
+      return (
+        (m.customer_name || "").toLowerCase().includes(q) ||
+        (m.customer_email || "").toLowerCase().includes(q) ||
+        (m.message || "").toLowerCase().includes(q) ||
+        (m.sender || "").toLowerCase().includes(q)
+      );
+    });
+  }, [rawChats, chatSearch]);
+
+  const handleSelectSession = (sessionId) => {
+    setSelectedSessionId(sessionId);
+    setTimeout(() => {
+      const el = document.getElementById("chat-transcript-view");
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    }, 60);
+  };
+
+  const handleCopyMessageText = (msgId, text) => {
+    try {
+      navigator.clipboard.writeText(text);
+      setCopiedMsgId(msgId);
+      setTimeout(() => setCopiedMsgId(null), 2200);
+    } catch {}
+  };
+
+  const toggleCardAccordion = (sessionId, e) => {
+    if (e) e.stopPropagation();
+    setExpandedCardId((prev) => (prev === sessionId ? null : sessionId));
+  };
 
   const handleDeleteSession = async (sessionId, e) => {
     if (e) e.stopPropagation();
@@ -174,11 +271,171 @@ export default function AdminDashboard() {
   });
   const todaysRevenue = todaysOrders.reduce((sum, o) => sum + (o.total || 0), 0);
 
+  // Aggregated Customer Data (from orders, chats, and contexts)
+  const aggregatedCustomers = useMemo(() => {
+    const map = new Map();
+
+    // 1. Ingest from Orders
+    orders.forEach((o) => {
+      const email = o.customer?.email || o.customer?.phone || `customer_${o.id}`;
+      const name = o.customer?.name || "Customer";
+      const phone = o.customer?.phone || "N/A";
+      const address = o.customer?.address || "N/A";
+
+      if (!map.has(email)) {
+        map.set(email, {
+          name,
+          email,
+          phone,
+          address,
+          orders: [],
+          cart: [],
+          favorites: [],
+          reviews: [],
+          chatCount: 0,
+        });
+      }
+      const c = map.get(email);
+      c.orders.push(o);
+      if (name !== "Customer" && c.name === "Customer") c.name = name;
+      if (phone !== "N/A" && c.phone === "N/A") c.phone = phone;
+      if (address !== "N/A" && c.address === "N/A") c.address = address;
+    });
+
+    // 2. Ingest from Chat Sessions
+    sessions.forEach((s) => {
+      const email = s.customerEmail || s.customerName || `chat_${s.sessionId}`;
+      if (!map.has(email)) {
+        map.set(email, {
+          name: s.customerName || "Chat Customer",
+          email: s.customerEmail || "N/A",
+          phone: "N/A",
+          address: "N/A",
+          orders: [],
+          cart: [],
+          favorites: [],
+          reviews: [],
+          chatCount: s.messageCount,
+        });
+      } else {
+        const c = map.get(email);
+        c.chatCount += s.messageCount;
+      }
+    });
+
+    // 3. Attach reviews by name
+    reviews.forEach((r) => {
+      let matched = false;
+      map.forEach((c) => {
+        if (c.name.toLowerCase() === r.name.toLowerCase()) {
+          c.reviews.push(r);
+          matched = true;
+        }
+      });
+      if (!matched) {
+        map.set(`review_${r.id}`, {
+          name: r.name,
+          email: "Verified Reviewer",
+          phone: "N/A",
+          address: "N/A",
+          orders: [],
+          cart: [],
+          favorites: [],
+          reviews: [r],
+          chatCount: 0,
+        });
+      }
+    });
+
+    // 4. Attach active session cart & favorites to the primary logged-in or demo user
+    const list = Array.from(map.values());
+    if (list.length > 0) {
+      list[0].cart = globalCartItems;
+      list[0].favorites = globalFavorites;
+    } else {
+      // Default sample customer if empty
+      list.push({
+        name: "Hakim Bhai",
+        email: "ah1572986@gmail.com",
+        phone: "03070769139",
+        address: "Sector 36-B, Korangi, Karachi",
+        orders: orders,
+        cart: globalCartItems,
+        favorites: globalFavorites,
+        reviews: reviews,
+        chatCount: sessions.length,
+      });
+    }
+
+    return list;
+  }, [orders, sessions, reviews, globalCartItems, globalFavorites]);
+
+  const filteredCustomers = aggregatedCustomers.filter((c) => {
+    const q = customerSearch.toLowerCase();
+    return (
+      c.name.toLowerCase().includes(q) ||
+      c.email.toLowerCase().includes(q) ||
+      c.phone.toLowerCase().includes(q) ||
+      c.address.toLowerCase().includes(q)
+    );
+  });
+
+  const filteredReviews = reviews.filter((r) => {
+    const q = reviewSearch.toLowerCase();
+    return r.name.toLowerCase().includes(q) || r.comment.toLowerCase().includes(q);
+  });
+
+  // Review Actions
+  const handleOpenEditReview = (r) => {
+    setEditingReview(r);
+    setReviewForm({ name: r.name, rating: r.rating, comment: r.comment });
+  };
+
+  const handleSaveReview = (e) => {
+    e.preventDefault();
+    if (!reviewForm.name || !reviewForm.comment) return;
+
+    if (editingReview) {
+      updateReview(editingReview.id, {
+        name: reviewForm.name,
+        rating: Number(reviewForm.rating),
+        comment: reviewForm.comment,
+      });
+      setEditingReview(null);
+    } else {
+      addReview({
+        name: reviewForm.name,
+        rating: Number(reviewForm.rating),
+        comment: reviewForm.comment,
+      });
+      setShowAddReviewModal(false);
+    }
+    setReviewForm({ name: "", rating: 5, comment: "" });
+  };
+
+  const handleDeleteReview = (id) => {
+    if (window.confirm("Kiya aap waqai is customer review ko delete karna chahte hain?")) {
+      deleteReview(id);
+    }
+  };
+
+  // Website Settings Save
+  const handleSaveSettings = (e) => {
+    e.preventDefault();
+    localStorage.setItem("am_website_settings", JSON.stringify(siteSettings));
+    setSettingsSaved(true);
+    setTimeout(() => setSettingsSaved(false), 3000);
+  };
+
   const STATS = [
     { label: "Today's orders", value: todaysOrders.length, icon: ShoppingBag },
     { label: "Today's revenue", value: `Rs ${todaysRevenue}`, icon: DollarSign },
     { label: "Active Orders", value: orders.filter((o) => o.status !== "delivered").length, icon: CalendarCheck },
     { label: "Customer Chats", value: sessions.length, icon: MessageCircle },
+    { label: "Total Reviews", value: reviews.length, icon: Star },
+    { label: "Average Rating", value: `${averageRating} ★`, icon: Sparkles },
+    { label: "Customers", value: aggregatedCustomers.length, icon: Users },
+    { label: "Items in Cart", value: globalCartItems.length, icon: ShoppingCart },
   ];
 
   if (!isAdminLoggedIn()) {
@@ -190,62 +447,105 @@ export default function AdminDashboard() {
       className="w-full min-h-screen px-4 py-10"
       style={{ background: "linear-gradient(160deg, #0A0A0A 0%, #141414 60%, #0A0A0A 100%)" }}
     >
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-7xl mx-auto">
+        {/* Top Header */}
         <div className="flex items-center justify-between mb-8 flex-wrap gap-3">
           <div>
-            <h1 className="text-3xl font-bold text-white" style={{ fontFamily: "'Amiri', serif" }}>
-              Owner Admin Dashboard
-            </h1>
-            <p className="text-sm text-white/50">Al Madina Restaurant · Live Order Dispatch & Supabase Chat Control</p>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold text-white" style={{ fontFamily: "'Amiri', serif" }}>
+                Owner Admin Dashboard
+              </h1>
+              <span className="text-xs bg-[#D4AF37]/20 text-[#F0DFA0] border border-[#D4AF37]/40 px-2.5 py-0.5 rounded-full font-semibold">
+                Super Admin Access
+              </span>
+            </div>
+            <p className="text-sm text-white/50 mt-1">
+              Al Madina Restaurant · Orders Dispatch, Supabase Chats, Reviews, Customer Carts & Website Data
+            </p>
           </div>
           <button
             onClick={handleLogout}
-            className="inline-flex items-center gap-2 text-xs text-white/60 hover:text-red-400 border border-white/10 hover:border-red-500/40 px-3.5 py-2 rounded-lg transition-all"
+            className="inline-flex items-center gap-2 text-xs text-white/60 hover:text-red-400 border border-white/10 hover:border-red-500/40 px-3.5 py-2 rounded-lg transition-all cursor-pointer"
           >
             <LogOut size={14} /> Log out
           </button>
         </div>
 
         {/* Stats grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 mb-8">
           {STATS.map((s) => (
-            <div key={s.label} className="bg-white/[0.03] border border-[#D4AF37]/25 rounded-2xl p-5 backdrop-blur-sm">
-              <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 border border-[#D4AF37]/20 flex items-center justify-center text-[#D4AF37] mb-3">
-                <s.icon size={20} />
+            <div key={s.label} className="bg-white/[0.03] border border-[#D4AF37]/20 rounded-xl p-3.5 backdrop-blur-sm">
+              <div className="w-8 h-8 rounded-lg bg-[#D4AF37]/10 border border-[#D4AF37]/20 flex items-center justify-center text-[#D4AF37] mb-2">
+                <s.icon size={16} />
               </div>
-              <p className="text-white text-2xl font-bold">{s.value}</p>
-              <p className="text-xs text-white/55 mt-1">{s.label}</p>
+              <p className="text-white text-lg font-bold">{s.value}</p>
+              <p className="text-[10px] text-white/55 truncate">{s.label}</p>
             </div>
           ))}
         </div>
 
-        {/* Tab Navigation */}
+        {/* Tab Navigation (5 Comprehensive Tabs) */}
         <div className="flex items-center gap-2 mb-6 border-b border-white/10 pb-3 flex-wrap">
           <button
             onClick={() => setActiveTab("orders")}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
               activeTab === "orders"
                 ? "bg-[#D4AF37] text-black shadow-lg shadow-[#D4AF37]/20"
                 : "text-white/70 hover:text-white bg-white/5 hover:bg-white/10"
             }`}
           >
-            <ShoppingBag size={16} />
+            <ShoppingBag size={15} />
             Orders & Live Dispatch ({orders.length})
           </button>
           <button
             onClick={() => setActiveTab("chats")}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
               activeTab === "chats"
                 ? "bg-[#D4AF37] text-black shadow-lg shadow-[#D4AF37]/20"
                 : "text-white/70 hover:text-white bg-white/5 hover:bg-white/10"
             }`}
           >
-            <MessageCircle size={16} />
+            <MessageCircle size={15} />
             Customer AI Chats & Supabase ({sessions.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("reviews")}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+              activeTab === "reviews"
+                ? "bg-[#D4AF37] text-black shadow-lg shadow-[#D4AF37]/20"
+                : "text-white/70 hover:text-white bg-white/5 hover:bg-white/10"
+            }`}
+          >
+            <Star size={15} />
+            Customer Reviews ({reviews.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("customers")}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+              activeTab === "customers"
+                ? "bg-[#D4AF37] text-black shadow-lg shadow-[#D4AF37]/20"
+                : "text-white/70 hover:text-white bg-white/5 hover:bg-white/10"
+            }`}
+          >
+            <Users size={15} />
+            Customer Activity, Carts & Favorites ({aggregatedCustomers.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("settings")}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+              activeTab === "settings"
+                ? "bg-[#D4AF37] text-black shadow-lg shadow-[#D4AF37]/20"
+                : "text-white/70 hover:text-white bg-white/5 hover:bg-white/10"
+            }`}
+          >
+            <Settings size={15} />
+            Website Data & Owner Info
           </button>
         </div>
 
+        {/* ======================================================== */}
         {/* TAB 1: Live Orders Management */}
+        {/* ======================================================== */}
         {activeTab === "orders" && (
           <div className="bg-white/[0.03] border border-[#D4AF37]/25 rounded-2xl p-6 mb-8">
             <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
@@ -282,7 +582,7 @@ export default function AdminDashboard() {
                     >
                       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4 pb-4 border-b border-white/10">
                         <div>
-                          <div className="flex items-center gap-3 mb-1">
+                          <div className="flex items-center gap-3 mb-1 flex-wrap">
                             <span className="text-white font-bold text-base">#{o.id}</span>
                             <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${badge.bg}`}>
                               {badge.label}
@@ -292,15 +592,15 @@ export default function AdminDashboard() {
                             </span>
                           </div>
                           <p className="text-xs text-white/70">
-                            Customer: <span className="text-white font-medium">{o.customer?.name || "N/A"}</span> · Phone:{" "}
-                            <span className="text-[#D4AF37]">{o.customer?.phone || "N/A"}</span>
+                            Customer: <span className="text-white font-medium">{o.customer?.name || "Hakim Bhai"}</span> · Phone:{" "}
+                            <span className="text-[#D4AF37]">{o.customer?.phone || "03070769139"}</span>
                           </p>
                           {o.customer?.address && (
                             <p className="text-xs text-white/55 mt-0.5">📍 {o.customer.address}</p>
                           )}
                         </div>
 
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 flex-wrap">
                           <span className="text-lg font-bold text-white">Rs {o.total}</span>
                           {waCustomerUrl && (
                             <a
@@ -320,6 +620,17 @@ export default function AdminDashboard() {
                             <Eye size={14} />
                             View Map
                           </Link>
+                          <button
+                            onClick={() => {
+                              if (window.confirm(`Order #${o.id} ko delete karna chahte hain?`)) {
+                                deleteOrder(o.id);
+                              }
+                            }}
+                            className="p-1.5 text-white/40 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all cursor-pointer"
+                            title="Delete Order"
+                          >
+                            <Trash2 size={15} />
+                          </button>
                         </div>
                       </div>
 
@@ -332,7 +643,7 @@ export default function AdminDashboard() {
                               key={idx}
                               className="text-xs bg-white/5 border border-white/10 px-2.5 py-1 rounded-md text-white/80"
                             >
-                              {it.quantity}× {it.name}
+                              {it.quantity}× {it.name} (Rs {it.price})
                             </span>
                           ))}
                         </div>
@@ -345,7 +656,7 @@ export default function AdminDashboard() {
                         {o.status === "awaiting_approval" && (
                           <button
                             onClick={() => updateOrderStatus(o.id, "preparing")}
-                            className="inline-flex items-center gap-1.5 text-xs bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 px-3 py-1.5 rounded-md font-medium transition-all"
+                            className="inline-flex items-center gap-1.5 text-xs bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 px-3 py-1.5 rounded-md font-medium transition-all cursor-pointer"
                           >
                             <Check size={13} />
                             Confirm Order & Start Kitchen
@@ -355,7 +666,7 @@ export default function AdminDashboard() {
                         {o.status !== "out_for_delivery" && o.status !== "delivered" && (
                           <button
                             onClick={() => updateOrderStatus(o.id, "out_for_delivery")}
-                            className="inline-flex items-center gap-1.5 text-xs bg-emerald-500 hover:bg-emerald-400 text-black font-bold px-3.5 py-1.5 rounded-md transition-all shadow-md"
+                            className="inline-flex items-center gap-1.5 text-xs bg-emerald-500 hover:bg-emerald-400 text-black font-bold px-3.5 py-1.5 rounded-md transition-all shadow-md cursor-pointer"
                           >
                             <Bike size={14} />
                             Dispatch Rider (Start GPS Bike Tracking)
@@ -365,7 +676,7 @@ export default function AdminDashboard() {
                         {o.status === "out_for_delivery" && (
                           <button
                             onClick={() => updateOrderStatus(o.id, "delivered")}
-                            className="inline-flex items-center gap-1.5 text-xs bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/40 px-3 py-1.5 rounded-md font-medium transition-all"
+                            className="inline-flex items-center gap-1.5 text-xs bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/40 px-3 py-1.5 rounded-md font-medium transition-all cursor-pointer"
                           >
                             <Check size={13} />
                             Mark as Delivered
@@ -384,7 +695,9 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* ======================================================== */}
         {/* TAB 2: Customer AI Chats & Supabase Management */}
+        {/* ======================================================== */}
         {activeTab === "chats" && (
           <div className="bg-white/[0.03] border border-[#D4AF37]/25 rounded-2xl p-6 mb-8">
             {/* Top Toolbar */}
@@ -409,19 +722,44 @@ export default function AdminDashboard() {
               </div>
 
               <div className="flex items-center gap-2 flex-wrap">
+                {/* View Mode Toggle */}
+                <div className="flex items-center bg-black/40 border border-white/10 rounded-lg p-0.5">
+                  <button
+                    onClick={() => setChatViewMode("split")}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
+                      chatViewMode === "split"
+                        ? "bg-[#D4AF37] text-black font-semibold shadow"
+                        : "text-white/60 hover:text-white"
+                    }`}
+                  >
+                    <Columns size={13} />
+                    Conversations ({sessions.length})
+                  </button>
+                  <button
+                    onClick={() => setChatViewMode("all_table")}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
+                      chatViewMode === "all_table"
+                        ? "bg-[#D4AF37] text-black font-semibold shadow"
+                        : "text-white/60 hover:text-white"
+                    }`}
+                  >
+                    <List size={13} />
+                    Sabhi Messages Ka Text ({rawChats.length})
+                  </button>
+                </div>
+
                 <button
                   onClick={loadChats}
                   disabled={chatsLoading}
-                  className="inline-flex items-center gap-1.5 text-xs bg-white/10 hover:bg-white/15 text-white px-3 py-1.5 rounded-lg border border-white/10 transition-all disabled:opacity-50"
-                  title="Refresh chats from Supabase"
+                  className="inline-flex items-center gap-1.5 text-xs bg-white/5 hover:bg-white/10 border border-white/15 px-3 py-1.5 rounded-lg text-white/80 transition-all cursor-pointer"
+                  title="Reload chats from Supabase"
                 >
                   <RefreshCw size={13} className={chatsLoading ? "animate-spin" : ""} />
                   Refresh
                 </button>
                 <button
                   onClick={() => setShowSqlModal(true)}
-                  className="inline-flex items-center gap-1.5 text-xs bg-[#D4AF37]/15 hover:bg-[#D4AF37]/25 text-[#F0DFA0] border border-[#D4AF37]/40 px-3 py-1.5 rounded-lg transition-all"
-                  title="View Supabase SQL Query to create customer_chats table"
+                  className="inline-flex items-center gap-1.5 text-xs bg-[#D4AF37]/15 hover:bg-[#D4AF37]/25 border border-[#D4AF37]/40 px-3 py-1.5 rounded-lg text-[#F0DFA0] transition-all cursor-pointer font-medium"
                 >
                   <Database size={13} />
                   Supabase SQL Setup
@@ -429,8 +767,7 @@ export default function AdminDashboard() {
                 {sessions.length > 0 && (
                   <button
                     onClick={handleClearAllChats}
-                    className="inline-flex items-center gap-1.5 text-xs bg-red-500/15 hover:bg-red-500/25 text-red-400 border border-red-500/30 px-3 py-1.5 rounded-lg transition-all"
-                    title="Delete all customer chats"
+                    className="inline-flex items-center gap-1.5 text-xs bg-red-500/15 hover:bg-red-500/25 border border-red-500/40 px-3 py-1.5 rounded-lg text-red-300 transition-all cursor-pointer font-medium"
                   >
                     <Trash2 size={13} />
                     Clear All Chats
@@ -439,85 +776,188 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Search filter */}
-            <div className="mb-6 flex items-center justify-between gap-4 flex-wrap">
-              <div className="relative flex-1 min-w-[240px]">
-                <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/40" />
+            {/* Hakim Bhai Roman Urdu Guide Banner */}
+            <div className="mb-4 bg-gradient-to-r from-[#D4AF37]/15 via-black/40 to-[#D4AF37]/10 border border-[#D4AF37]/35 rounded-xl p-3.5 text-xs">
+              <div className="flex items-center gap-2 text-[#F0DFA0] font-bold text-sm mb-1.5">
+                <Sparkles size={16} className="text-[#D4AF37]" />
+                <span>Hakim Bhai Guide: Messages Ka Text Kahan Aur Kaise Dekhein?</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-white/85 text-[11px] leading-relaxed">
+                <div className="bg-black/30 p-2.5 rounded-lg border border-white/5">
+                  <p className="font-semibold text-[#D4AF37] mb-1">🖥️ 1. Iss Website Admin Portal Par:</p>
+                  <p>
+                    • Neechay customer ke card par <strong className="text-white">"Pura Message Text Kholein"</strong> par click karein. Saamne right side par unke tamam messages ka mukammal text open ho jayega.<br />
+                    • Ya upar <strong className="text-[#D4AF37]">"Sabhi Messages Ka Text"</strong> button dabayein, jahan har ek message ka text bina kisi click ke saamne list mein nazar aayega!
+                  </p>
+                </div>
+                <div className="bg-black/30 p-2.5 rounded-lg border border-white/5">
+                  <p className="font-semibold text-emerald-400 mb-1">🗄️ 2. Supabase Dashboard (supabase.com) Par:</p>
+                  <p>
+                    • Supabase mein left menu ke <strong className="text-white">"Table Editor"</strong> (grid icon) par click karein.<br />
+                    • Phir table <strong className="text-emerald-300">"customer_chats"</strong> select karein. Wahan <strong className="text-white">"message"</strong> column mein customer ka likha hua pura text hota hai! Row par double click kar ke pura text bara kar ke bhi parh sakte hain.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Search bar */}
+            <div className="mb-4">
+              <div className="relative">
+                <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/40" />
                 <input
                   type="text"
                   value={chatSearch}
                   onChange={(e) => setChatSearch(e.target.value)}
                   placeholder="Search by customer name, email, or message keyword..."
-                  className="w-full bg-black/40 border border-white/10 focus:border-[#D4AF37]/50 rounded-xl pl-10 pr-4 py-2 text-xs text-white placeholder-white/30 focus:outline-none transition-all"
+                  className="w-full bg-black/40 border border-white/10 focus:border-[#D4AF37] rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-white/40 focus:outline-none"
                 />
               </div>
-              <span className="text-xs text-white/40">
-                Total Conversations: <strong className="text-white">{sessions.length}</strong> · Messages:{" "}
-                <strong className="text-white">{rawChats.length}</strong>
-              </span>
             </div>
 
-            {/* Empty state */}
+            {/* Split layout: sessions list (left) & conversation transcript (right) */}
             {sessions.length === 0 ? (
-              <div className="text-center py-12 px-4 bg-black/20 rounded-xl border border-white/5">
-                <MessageCircle size={36} className="mx-auto text-white/20 mb-3" />
-                <p className="text-white font-medium text-base mb-1">Filhal koi customer chat record nahi hui</p>
+              <div className="py-16 text-center bg-black/20 border border-dashed border-white/10 rounded-xl">
+                <Bot size={36} className="mx-auto text-[#D4AF37]/60 mb-3" />
+                <p className="text-white text-base font-semibold mb-1">Abhi tak koi chat record nahi hua</p>
                 <p className="text-xs text-white/50 max-w-md mx-auto mb-5">
-                  Jab customer website ke chatbot se sawal poochega (jaise biryani rates, address, bil calculation), unki
-                  guftagu Supabase mein save ho kar foran yahan dikhayi degi.
+                  Jab customer chatbot par sawaal puchega, ya koi dish/order ka rate maangega, unki live guftagu yahan Supabase mein show hogi.
                 </p>
                 <button
                   onClick={handleAddSampleChat}
-                  className="inline-flex items-center gap-2 text-xs bg-[#D4AF37] hover:bg-[#F0DFA0] text-black font-bold px-4 py-2 rounded-xl transition-all shadow-md"
+                  className="inline-flex items-center gap-2 text-xs bg-[#D4AF37] hover:bg-[#F0DFA0] text-black font-semibold px-4 py-2 rounded-xl transition-all shadow-md cursor-pointer"
                 >
                   <Sparkles size={14} />
-                  Test Sample Customer Chat Add Karein
+                  Add Sample Customer Chat (Test)
                 </button>
               </div>
+            ) : chatViewMode === "all_table" ? (
+              /* VIEW MODE: Flat List of All Messages */
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-xs text-white/60 px-1">
+                  <span>Sabhi Messages Ka Mukammal Text ({filteredFlatMessages.length})</span>
+                  <span className="text-[11px] text-white/40">Har message ka pura text bina cut kiye neechay mojood hai</span>
+                </div>
+
+                {filteredFlatMessages.length === 0 ? (
+                  <div className="p-8 text-center text-white/40 text-xs bg-black/20 rounded-xl border border-white/10">
+                    Koi message search criteria se match nahi hua.
+                  </div>
+                ) : (
+                  filteredFlatMessages.map((m) => {
+                    const isCust = m.sender === "customer";
+                    return (
+                      <div
+                        key={m.id}
+                        className="bg-black/50 border border-white/10 hover:border-[#D4AF37]/40 rounded-xl p-4 transition-all"
+                      >
+                        <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold flex items-center gap-1.5 ${
+                                isCust
+                                  ? "bg-[#D4AF37]/20 text-[#F0DFA0] border border-[#D4AF37]/40"
+                                  : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                              }`}
+                            >
+                              {isCust ? <User size={12} /> : <Bot size={12} />}
+                              {isCust ? "Customer Ka Message" : "AI Shahi Host Ka Jawab"}
+                            </span>
+                            <span className="text-white font-medium text-xs">
+                              {m.customer_name || "Guest Customer"}
+                            </span>
+                            {m.customer_email && (
+                              <span className="text-white/40 text-[11px]">({m.customer_email})</span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2 text-[11px] text-white/50">
+                            <Clock size={12} />
+                            <span>{new Date(m.created_at).toLocaleString()}</span>
+                            <button
+                              onClick={() => handleCopyMessageText(m.id, m.message)}
+                              className="inline-flex items-center gap-1 text-white/70 hover:text-[#D4AF37] px-2 py-0.5 rounded hover:bg-white/5 transition-all cursor-pointer font-medium"
+                              title="Copy Message Text"
+                            >
+                              {copiedMsgId === m.id ? (
+                                <>
+                                  <Check size={12} className="text-emerald-400" />
+                                  <span className="text-emerald-400">Copied!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy size={12} />
+                                  <span>Copy Text</span>
+                                </>
+                              )}
+                            </button>
+                            <button
+                              onClick={() => handleDeleteSingleMessage(m.id)}
+                              className="text-white/40 hover:text-red-400 p-1 rounded hover:bg-red-500/10 transition-all cursor-pointer"
+                              title="Delete Message"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Full message text */}
+                        <div
+                          className={`p-3.5 rounded-lg text-xs leading-relaxed ${
+                            isCust
+                              ? "bg-[#D4AF37]/10 border border-[#D4AF37]/25 text-white font-medium"
+                              : "bg-white/5 border border-white/10 text-white/90"
+                          }`}
+                        >
+                          <p className="whitespace-pre-wrap">{m.message}</p>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             ) : (
-              /* Two-column layout: Sessions on left, Full Transcript on right */
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-                {/* Left Column: Sessions List */}
-                <div className="lg:col-span-5 space-y-2.5 max-h-[600px] overflow-y-auto pr-1">
+              /* VIEW MODE: Split Sessions + Transcript */
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 min-h-[460px]">
+                {/* Left column: Sessions List */}
+                <div className="lg:col-span-5 bg-black/40 border border-white/10 rounded-xl p-3 flex flex-col gap-2.5 max-h-[620px] overflow-y-auto">
+                  <div className="flex items-center justify-between px-2 py-1 text-[11px] text-white/50 uppercase tracking-wider">
+                    <span>Customer Conversations ({filteredSessions.length})</span>
+                    <span className="text-[10px] text-[#D4AF37]">Click to read text</span>
+                  </div>
+
                   {filteredSessions.map((s) => {
-                    const isSelected = activeSession?.sessionId === s.sessionId;
+                    const isSelected = s.sessionId === selectedSessionId;
+                    const isExpandedInline = expandedCardId === s.sessionId;
                     const lastMsg = s.messages[s.messages.length - 1];
 
                     return (
                       <div
                         key={s.sessionId}
-                        onClick={() => setSelectedSessionId(s.sessionId)}
-                        className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
+                        className={`p-3.5 rounded-xl border transition-all relative ${
                           isSelected
-                            ? "bg-[#D4AF37]/15 border-[#D4AF37] shadow-lg shadow-black/40"
-                            : "bg-black/40 border-white/10 hover:border-white/25 hover:bg-black/60"
+                            ? "bg-[#D4AF37]/15 border-[#D4AF37] shadow-lg shadow-[#D4AF37]/10"
+                            : "bg-white/[0.02] border-white/10 hover:border-white/20 hover:bg-white/[0.05]"
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2 mb-1.5">
                           <div className="flex items-center gap-2 min-w-0">
-                            <div className="w-7 h-7 rounded-full bg-[#D4AF37]/20 border border-[#D4AF37]/40 flex items-center justify-center text-[#D4AF37] text-xs font-bold shrink-0">
-                              {s.customerName.charAt(0).toUpperCase()}
+                            <div className="w-8 h-8 rounded-full bg-[#D4AF37]/20 border border-[#D4AF37]/40 flex items-center justify-center text-[#D4AF37] shrink-0 text-xs font-bold">
+                              {s.customerName[0]?.toUpperCase() || "C"}
                             </div>
-                            <div className="truncate">
+                            <div className="min-w-0">
                               <p className="text-xs font-bold text-white truncate">{s.customerName}</p>
-                              <p className="text-[10px] text-white/45 truncate">{s.customerEmail}</p>
+                              <p className="text-[10px] text-white/50 truncate">{s.customerEmail}</p>
                             </div>
                           </div>
 
                           <div className="flex items-center gap-1.5 shrink-0">
-                            {s.isRegistered ? (
-                              <span className="text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.5 rounded font-medium">
-                                User
-                              </span>
-                            ) : (
-                              <span className="text-[9px] bg-white/10 text-white/60 px-1.5 py-0.5 rounded font-medium">
-                                Guest
-                              </span>
-                            )}
+                            <span className="text-[10px] bg-[#D4AF37]/20 border border-[#D4AF37]/30 text-[#F0DFA0] font-semibold px-2 py-0.5 rounded-full">
+                              {s.messageCount} Messages
+                            </span>
                             <button
                               onClick={(e) => handleDeleteSession(s.sessionId, e)}
-                              className="text-white/30 hover:text-red-400 p-1 hover:bg-red-500/10 rounded transition-all"
-                              title="Delete this customer chat"
+                              className="text-white/30 hover:text-red-400 p-1 rounded hover:bg-red-500/10 transition-all cursor-pointer"
+                              title="Delete this chat from Supabase"
                             >
                               <Trash2 size={13} />
                             </button>
@@ -525,139 +965,172 @@ export default function AdminDashboard() {
                         </div>
 
                         {lastMsg && (
-                          <p className="text-[11px] text-white/60 line-clamp-2 mt-1">
-                            <span className="text-white/40">{lastMsg.sender === "customer" ? "Customer: " : "Bot: "}</span>
-                            {lastMsg.message}
-                          </p>
+                          <div className="text-[11px] text-white/70 bg-black/30 p-2 rounded-lg border border-white/5 my-2">
+                            <span className="text-[#D4AF37] font-semibold">
+                              {lastMsg.sender === "customer" ? "Aakhri Sawaal: " : "AI Jawab: "}
+                            </span>
+                            <span className="line-clamp-2">{lastMsg.message}</span>
+                          </div>
                         )}
 
-                        <div className="flex items-center justify-between text-[10px] text-white/35 mt-2 pt-1.5 border-t border-white/5">
-                          <span>{new Date(s.lastMessageAt).toLocaleDateString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
-                          <span>{s.messages.length} messages</span>
+                        <div className="flex items-center justify-between text-[10px] text-white/40 mb-2">
+                          <span>
+                            {new Date(s.lastMessageAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} ·{" "}
+                            {new Date(s.lastMessageAt).toLocaleDateString()}
+                          </span>
+                          <button
+                            onClick={(e) => toggleCardAccordion(s.sessionId, e)}
+                            className="text-[#D4AF37] hover:underline inline-flex items-center gap-1 cursor-pointer font-medium"
+                          >
+                            {isExpandedInline ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                            {isExpandedInline ? "Card Band Karein" : "Card Ke Andar Kholein"}
+                          </button>
                         </div>
+
+                        {/* Direct Button to open Full Transcript */}
+                        <button
+                          onClick={() => handleSelectSession(s.sessionId)}
+                          className={`w-full inline-flex items-center justify-center gap-1.5 text-xs font-bold py-2 px-3 rounded-lg transition-all shadow cursor-pointer ${
+                            isSelected
+                              ? "bg-[#D4AF37] hover:bg-[#F0DFA0] text-black"
+                              : "bg-white/10 hover:bg-[#D4AF37] hover:text-black text-white"
+                          }`}
+                        >
+                          <Eye size={13} />
+                          <span>Pura Message Text Dekhein / Open</span>
+                        </button>
+
+                        {/* Inline Accordion Messages if toggled */}
+                        {isExpandedInline && (
+                          <div className="mt-3 pt-3 border-t border-white/10 space-y-2 bg-black/40 p-2.5 rounded-lg">
+                            <p className="text-[10px] text-[#D4AF37] font-semibold uppercase tracking-wider">
+                              Guftagu Ka Text (Inline):
+                            </p>
+                            {s.messages.map((m) => (
+                              <div
+                                key={m.id}
+                                className={`p-2 rounded text-[11px] leading-relaxed ${
+                                  m.sender === "customer"
+                                    ? "bg-[#D4AF37]/20 border border-[#D4AF37]/30 text-white"
+                                    : "bg-white/5 border border-white/10 text-white/80"
+                                }`}
+                              >
+                                <span className="font-bold text-[10px] block text-[#D4AF37]">
+                                  {m.sender === "customer" ? `Customer (${s.customerName}):` : "AI Shahi Host:"}
+                                </span>
+                                <p className="whitespace-pre-wrap mt-0.5">{m.message}</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
                 </div>
 
-                {/* Right Column: Full Conversation Transcript */}
-                <div className="lg:col-span-7 bg-black/50 border border-white/10 rounded-xl p-4 flex flex-col h-[600px]">
+                {/* Right column: Selected Conversation Transcript */}
+                <div
+                  id="chat-transcript-view"
+                  className="lg:col-span-7 bg-black/60 border border-[#D4AF37]/30 rounded-xl p-4 flex flex-col justify-between max-h-[620px] shadow-xl"
+                >
                   {activeSession ? (
                     <>
                       {/* Transcript Header */}
-                      <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/10 flex-wrap gap-2">
+                      <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-3 flex-wrap gap-2">
                         <div className="flex items-center gap-2.5">
-                          <div className="w-9 h-9 rounded-full bg-[#D4AF37]/20 border border-[#D4AF37]/40 flex items-center justify-center text-[#D4AF37] font-bold text-sm">
-                            <User size={16} />
+                          <div className="w-9 h-9 rounded-full bg-[#D4AF37]/20 border border-[#D4AF37]/40 flex items-center justify-center text-[#D4AF37] text-sm font-bold">
+                            {activeSession.customerName[0]?.toUpperCase() || "C"}
                           </div>
                           <div>
-                            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                              {activeSession.customerName}
-                              {activeSession.isRegistered && (
-                                <span className="text-[10px] text-emerald-400 font-normal">● Registered Customer</span>
-                              )}
-                            </h3>
-                            <p className="text-xs text-white/50">{activeSession.customerEmail}</p>
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-sm font-bold text-white">{activeSession.customerName}</h3>
+                              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.2 rounded-full font-medium">
+                                Active Chat
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-white/50">
+                              {activeSession.customerEmail || "No email"} · Total {activeSession.messageCount} Messages
+                            </p>
                           </div>
                         </div>
 
                         <div className="flex items-center gap-2">
-                          {confirmDeleteId === activeSession.sessionId ? (
-                            <div className="flex items-center gap-1.5 bg-red-500/20 border border-red-500/40 p-1 rounded-lg">
-                              <span className="text-[11px] text-red-300 px-1">Delete confirm?</span>
-                              <button
-                                onClick={() => handleDeleteSession(activeSession.sessionId)}
-                                className="text-[11px] bg-red-600 text-white font-bold px-2 py-0.5 rounded hover:bg-red-500"
-                              >
-                                Haan, Delete
-                              </button>
-                              <button
-                                onClick={() => setConfirmDeleteId(null)}
-                                className="text-[11px] text-white/60 hover:text-white px-1"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => setConfirmDeleteId(activeSession.sessionId)}
-                              className="inline-flex items-center gap-1.5 text-xs bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 px-2.5 py-1.5 rounded-lg transition-all"
-                            >
-                              <Trash2 size={13} />
-                              Delete This Chat
-                            </button>
-                          )}
+                          <button
+                            onClick={(e) => handleDeleteSession(activeSession.sessionId, e)}
+                            className="inline-flex items-center gap-1.5 text-[11px] bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/30 px-2.5 py-1 rounded-lg transition-all cursor-pointer font-medium"
+                          >
+                            <Trash2 size={12} />
+                            Delete Chat
+                          </button>
                         </div>
                       </div>
 
-                      {/* Messages Scroll Area */}
-                      <div className="flex-1 overflow-y-auto space-y-3 pr-2 my-1">
+                      {/* Messages scroll area */}
+                      <div className="flex-1 overflow-y-auto space-y-3.5 pr-2 mb-3 max-h-[460px]">
                         {activeSession.messages.map((m) => {
                           const isCust = m.sender === "customer";
                           return (
                             <div
-                              key={m.id || m.created_at}
+                              key={m.id}
                               className={`flex flex-col group ${isCust ? "items-end" : "items-start"}`}
                             >
-                              <div className="flex items-center gap-1.5 mb-1 px-1 text-[10px] text-white/40">
+                              <div className="flex items-center gap-1.5 mb-1 px-1 text-[10px] text-white/50">
                                 {isCust ? (
                                   <>
-                                    <span>{activeSession.customerName}</span>
-                                    <User size={10} />
+                                    <span className="text-[#D4AF37] font-semibold">{activeSession.customerName} (Customer)</span>
+                                    <User size={11} className="text-[#D4AF37]" />
                                   </>
                                 ) : (
                                   <>
-                                    <Bot size={10} className="text-[#D4AF37]" />
-                                    <span className="text-[#D4AF37]">Al Madina AI Shahi Host</span>
+                                    <Bot size={11} className="text-emerald-400" />
+                                    <span className="text-emerald-300 font-semibold">AI Shahi Host (Al Madina)</span>
                                   </>
                                 )}
-                                <span>· {new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                                <span>·</span>
+                                <span>{new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                                <button
+                                  onClick={() => handleCopyMessageText(m.id, m.message)}
+                                  className="text-white/40 hover:text-[#D4AF37] p-1 rounded hover:bg-white/5 transition-all cursor-pointer ml-1"
+                                  title="Copy text"
+                                >
+                                  {copiedMsgId === m.id ? (
+                                    <Check size={11} className="text-emerald-400" />
+                                  ) : (
+                                    <Copy size={11} />
+                                  )}
+                                </button>
                                 <button
                                   onClick={() => handleDeleteSingleMessage(m.id)}
-                                  className="opacity-0 group-hover:opacity-100 text-white/30 hover:text-red-400 ml-1 transition-opacity"
+                                  className="opacity-0 group-hover:opacity-100 text-white/30 hover:text-red-400 transition-opacity cursor-pointer"
                                   title="Delete single message"
                                 >
-                                  <Trash2 size={10} />
+                                  <Trash2 size={11} />
                                 </button>
                               </div>
 
                               <div
-                                className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed whitespace-pre-wrap ${
+                                className={`rounded-2xl px-4 py-2.5 text-xs leading-relaxed max-w-[90%] shadow-md ${
                                   isCust
-                                    ? "bg-white/10 text-white border border-white/15 rounded-br-none"
-                                    : "bg-[#D4AF37]/10 text-white border border-[#D4AF37]/35 rounded-bl-none shadow-sm shadow-black"
+                                    ? "bg-[#D4AF37] text-black font-medium rounded-tr-none"
+                                    : "bg-white/10 border border-white/15 text-white/95 rounded-tl-none"
                                 }`}
                               >
-                                {m.message}
-
-                                {m.metadata && (m.metadata.dish || m.metadata.billTotal) && (
-                                  <div className="mt-2 pt-2 border-t border-white/10 flex flex-wrap gap-1.5 text-[10px]">
-                                    {m.metadata.dish && (
-                                      <span className="bg-[#D4AF37]/20 text-[#F0DFA0] px-2 py-0.5 rounded border border-[#D4AF37]/30">
-                                        🍽️ {m.metadata.dish}
-                                      </span>
-                                    )}
-                                    {m.metadata.billTotal && (
-                                      <span className="bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/30">
-                                        🧾 Bill: Rs {m.metadata.billTotal}
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
+                                <p className="whitespace-pre-wrap">{m.message}</p>
                               </div>
                             </div>
                           );
                         })}
                       </div>
 
-                      <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[11px] text-white/40">
-                        <span>Session ID: {activeSession.sessionId}</span>
+                      <div className="pt-2.5 border-t border-white/10 flex items-center justify-between text-[11px] text-white/40">
+                        <span>Session: {activeSession.sessionId}</span>
                         <span>Started: {new Date(activeSession.firstMessageAt).toLocaleString()}</span>
                       </div>
                     </>
                   ) : (
-                    <div className="flex-1 flex items-center justify-center text-white/40 text-xs">
-                      Select a customer conversation from the list to view.
+                    <div className="flex-1 flex flex-col items-center justify-center text-white/40 text-xs py-16">
+                      <Bot size={32} className="text-[#D4AF37]/50 mb-2" />
+                      <p>Kisi bhi customer conversation par click karein taakay message ka text yahan khul sakay.</p>
                     </div>
                   )}
                 </div>
@@ -666,7 +1139,483 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* ======================================================== */}
+        {/* TAB 3: Customer Reviews Moderation */}
+        {/* ======================================================== */}
+        {activeTab === "reviews" && (
+          <div className="bg-white/[0.03] border border-[#D4AF37]/25 rounded-2xl p-6 mb-8">
+            <div className="flex items-center justify-between mb-6 flex-wrap gap-3 pb-5 border-b border-white/10">
+              <div>
+                <h2 className="text-white text-xl font-semibold">Customer Reviews & Moderation</h2>
+                <p className="text-xs text-white/50 mt-0.5">
+                  Tamam customer reviews yahan list hain. Aap kisi bhi review ko edit, delete, ya naya verified review add kar sakte hain.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5 bg-[#D4AF37]/15 border border-[#D4AF37]/30 px-3 py-1.5 rounded-lg text-[#F0DFA0] text-xs font-semibold">
+                  <Star size={14} className="fill-[#D4AF37]" />
+                  <span>Avg: {averageRating} / 5.0 ({reviews.length} reviews)</span>
+                </div>
+                <button
+                  onClick={() => {
+                    setEditingReview(null);
+                    setReviewForm({ name: "Hakim Bhai", rating: 5, comment: "" });
+                    setShowAddReviewModal(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 text-xs bg-[#D4AF37] hover:bg-[#F0DFA0] text-black font-semibold px-3 py-1.5 rounded-lg transition-all shadow-md cursor-pointer"
+                >
+                  <Plus size={14} /> Add Review
+                </button>
+              </div>
+            </div>
+
+            {/* Search */}
+            <div className="mb-4">
+              <div className="relative">
+                <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/40" />
+                <input
+                  type="text"
+                  value={reviewSearch}
+                  onChange={(e) => setReviewSearch(e.target.value)}
+                  placeholder="Search reviews by customer name or comments..."
+                  className="w-full bg-black/40 border border-white/10 focus:border-[#D4AF37] rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-white/40 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Reviews List */}
+            {filteredReviews.length === 0 ? (
+              <p className="text-sm py-12 text-center text-white/50">Koi review nahi mila.</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredReviews.map((r) => (
+                  <div
+                    key={r.id}
+                    className="bg-black/40 border border-white/10 hover:border-[#D4AF37]/40 rounded-xl p-4 flex flex-col justify-between transition-all"
+                  >
+                    <div>
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div>
+                          <p className="text-white text-sm font-bold">{r.name}</p>
+                          <p className="text-[10px] text-white/40">{r.date || "Recent"}</p>
+                        </div>
+                        <div className="flex items-center gap-0.5 text-[#D4AF37]">
+                          {[...Array(5)].map((_, i) => (
+                            <Star
+                              key={i}
+                              size={13}
+                              className={i < r.rating ? "fill-[#D4AF37] text-[#D4AF37]" : "text-white/20"}
+                            />
+                          ))}
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-white/80 leading-relaxed italic bg-white/[0.02] p-2.5 rounded-lg border border-white/5 mb-4">
+                        "{r.comment}"
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
+                      <button
+                        onClick={() => handleOpenEditReview(r)}
+                        className="inline-flex items-center gap-1 text-[11px] bg-white/10 hover:bg-white/20 text-white font-medium px-2.5 py-1 rounded-md transition-all cursor-pointer"
+                      >
+                        <Edit3 size={12} /> Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteReview(r.id)}
+                        className="inline-flex items-center gap-1 text-[11px] bg-red-500/15 hover:bg-red-500/25 text-red-300 font-medium px-2.5 py-1 rounded-md transition-all cursor-pointer"
+                      >
+                        <Trash2 size={12} /> Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Edit / Add Review Modal */}
+            {(editingReview || showAddReviewModal) && (
+              <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+                <div className="bg-[#121212] border border-[#D4AF37]/40 rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-bold text-white">
+                      {editingReview ? "Edit Customer Review" : "Add New Customer Review"}
+                    </h3>
+                    <button
+                      onClick={() => {
+                        setEditingReview(null);
+                        setShowAddReviewModal(false);
+                      }}
+                      className="text-white/40 hover:text-white"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  <form onSubmit={handleSaveReview} className="space-y-4">
+                    <div>
+                      <label className="text-xs text-white/70 block mb-1">Customer Name</label>
+                      <input
+                        type="text"
+                        value={reviewForm.name}
+                        onChange={(e) => setReviewForm({ ...reviewForm, name: e.target.value })}
+                        placeholder="Hakim Bhai"
+                        className="w-full bg-black/50 border border-white/15 focus:border-[#D4AF37] rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-white/70 block mb-1">Rating (Stars)</label>
+                      <select
+                        value={reviewForm.rating}
+                        onChange={(e) => setReviewForm({ ...reviewForm, rating: Number(e.target.value) })}
+                        className="w-full bg-black/50 border border-white/15 focus:border-[#D4AF37] rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none"
+                      >
+                        <option value={5}>⭐⭐⭐⭐⭐ 5 Stars (Exceptional)</option>
+                        <option value={4}>⭐⭐⭐⭐ 4 Stars (Very Good)</option>
+                        <option value={3}>⭐⭐⭐ 3 Stars (Good)</option>
+                        <option value={2}>⭐⭐ 2 Stars (Average)</option>
+                        <option value={1}>⭐ 1 Star (Needs Improvement)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-white/70 block mb-1">Review Feedback</label>
+                      <textarea
+                        rows={4}
+                        value={reviewForm.comment}
+                        onChange={(e) => setReviewForm({ ...reviewForm, comment: e.target.value })}
+                        placeholder="Khana kaisa laga? Service aur taste ka review likhein..."
+                        className="w-full bg-black/50 border border-white/15 focus:border-[#D4AF37] rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none resize-none"
+                        required
+                      />
+                    </div>
+
+                    <div className="flex gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingReview(null);
+                          setShowAddReviewModal(false);
+                        }}
+                        className="flex-1 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-medium cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="flex-1 py-2 rounded-xl bg-[#D4AF37] hover:bg-[#F0DFA0] text-black text-xs font-bold shadow-md cursor-pointer"
+                      >
+                        {editingReview ? "Update Review" : "Save Review"}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ======================================================== */}
+        {/* TAB 4: Customer Activity, Carts & Favorites */}
+        {/* ======================================================== */}
+        {activeTab === "customers" && (
+          <div className="bg-white/[0.03] border border-[#D4AF37]/25 rounded-2xl p-6 mb-8">
+            <div className="flex items-center justify-between mb-6 flex-wrap gap-2 pb-5 border-b border-white/10">
+              <div>
+                <h2 className="text-white text-xl font-semibold">Customer Activity, Carts & Favorites</h2>
+                <p className="text-xs text-white/50 mt-0.5">
+                  Maloom karein kis customer ne kya orders diye, cart mein kya add kiya, aur kya favorat kiya hua hai.
+                </p>
+              </div>
+              <span className="text-xs bg-[#D4AF37]/15 text-[#F0DFA0] border border-[#D4AF37]/30 px-3 py-1 rounded-full font-medium">
+                {aggregatedCustomers.length} Total Customers
+              </span>
+            </div>
+
+            {/* Search */}
+            <div className="mb-4">
+              <div className="relative">
+                <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/40" />
+                <input
+                  type="text"
+                  value={customerSearch}
+                  onChange={(e) => setCustomerSearch(e.target.value)}
+                  placeholder="Search customer by name, email, phone or address..."
+                  className="w-full bg-black/40 border border-white/10 focus:border-[#D4AF37] rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-white/40 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {filteredCustomers.map((cust, idx) => {
+                const totalSpent = cust.orders.reduce((sum, o) => sum + (o.total || 0), 0);
+
+                return (
+                  <div
+                    key={idx}
+                    className="bg-black/40 border border-white/10 hover:border-[#D4AF37]/40 rounded-xl p-5 transition-all"
+                  >
+                    {/* Customer Header */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-4 border-b border-white/10">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-[#D4AF37]/20 border border-[#D4AF37]/40 flex items-center justify-center text-[#D4AF37] text-base font-bold">
+                          {cust.name[0]?.toUpperCase() || "C"}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="text-white text-base font-bold">{cust.name}</p>
+                            <span className="text-[10px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-semibold">
+                              Verified Customer
+                            </span>
+                          </div>
+                          <p className="text-xs text-white/60">
+                            📧 {cust.email} · 📞 <span className="text-[#D4AF37]">{cust.phone}</span>
+                          </p>
+                          {cust.address !== "N/A" && (
+                            <p className="text-xs text-white/50 mt-0.5">📍 {cust.address}</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <div className="text-right">
+                          <p className="text-xs text-white/50">Total Orders Placed</p>
+                          <p className="text-base font-bold text-[#D4AF37]">{cust.orders.length} orders (Rs {totalSpent})</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 3 Detail Boxes: Orders, Cart Items, Favorites */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* 1. Orders Placed */}
+                      <div className="bg-white/[0.02] border border-white/5 rounded-lg p-3">
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-white mb-2">
+                          <ShoppingBag size={13} className="text-[#D4AF37]" />
+                          <span>Orders History ({cust.orders.length})</span>
+                        </div>
+                        {cust.orders.length === 0 ? (
+                          <p className="text-[11px] text-white/40 italic">Koi order nahi mila</p>
+                        ) : (
+                          <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                            {cust.orders.map((o) => (
+                              <div key={o.id} className="text-[11px] bg-black/40 p-1.5 rounded flex justify-between text-white/80">
+                                <span>#{o.id} · Rs {o.total}</span>
+                                <span className="text-[#D4AF37] font-medium">{o.status}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 2. Items in Cart */}
+                      <div className="bg-white/[0.02] border border-white/5 rounded-lg p-3">
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-white mb-2">
+                          <ShoppingCart size={13} className="text-emerald-400" />
+                          <span>Items in Cart ({cust.cart.length})</span>
+                        </div>
+                        {cust.cart.length === 0 ? (
+                          <p className="text-[11px] text-white/40 italic">Cart khali hai</p>
+                        ) : (
+                          <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                            {cust.cart.map((item, i) => (
+                              <div key={i} className="text-[11px] bg-black/40 p-1.5 rounded flex justify-between text-white/80">
+                                <span>{item.quantity}× {item.name}</span>
+                                <span className="text-emerald-400 font-medium">Rs {item.price * item.quantity}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 3. Favorited Dishes */}
+                      <div className="bg-white/[0.02] border border-white/5 rounded-lg p-3">
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-white mb-2">
+                          <Heart size={13} className="text-red-400 fill-red-400" />
+                          <span>Favorited Dishes ({cust.favorites.length})</span>
+                        </div>
+                        {cust.favorites.length === 0 ? (
+                          <p className="text-[11px] text-white/40 italic">Koi favorite item nahi</p>
+                        ) : (
+                          <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                            {cust.favorites.map((fav, i) => (
+                              <span key={i} className="text-[10px] bg-red-500/10 border border-red-500/20 text-red-300 px-2 py-0.5 rounded-md">
+                                {fav.name} (Rs {fav.price})
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Customer Review Status */}
+                    {cust.reviews.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-white/5 flex items-center gap-2 text-xs text-white/70">
+                        <Star size={13} className="text-[#D4AF37] fill-[#D4AF37]" />
+                        <span>Customer Review: <strong>{cust.reviews[0].rating}★</strong> — "{cust.reviews[0].comment}"</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ======================================================== */}
+        {/* TAB 5: Website Settings & Owner Controls */}
+        {/* ======================================================== */}
+        {activeTab === "settings" && (
+          <div className="bg-white/[0.03] border border-[#D4AF37]/25 rounded-2xl p-6 mb-8 max-w-4xl mx-auto">
+            <div className="flex items-center justify-between mb-6 pb-4 border-b border-white/10">
+              <div>
+                <h2 className="text-white text-xl font-semibold">Website Data & Restaurant Settings</h2>
+                <p className="text-xs text-white/50 mt-0.5">
+                  Yahan se aap website ka official phone number, email, address, delivery rates aur timings edit kar sakte hain.
+                </p>
+              </div>
+              <span className="text-xs bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-full font-semibold">
+                Live Website Sync
+              </span>
+            </div>
+
+            {settingsSaved && (
+              <div className="mb-5 bg-emerald-500/15 border border-emerald-500/40 rounded-xl p-3 flex items-center gap-2 text-emerald-300 text-xs font-semibold">
+                <CheckCircle size={16} /> Website settings kamiyabi se save ho gayi hain! Tamam pages par apply ho chuki hain.
+              </div>
+            )}
+
+            <form onSubmit={handleSaveSettings} className="space-y-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-white/70 block mb-1.5 flex items-center gap-1.5">
+                    <User size={13} className="text-[#D4AF37]" /> Restaurant / Brand Name
+                  </label>
+                  <input
+                    type="text"
+                    value={siteSettings.restaurantName}
+                    onChange={(e) => setSiteSettings({ ...siteSettings, restaurantName: e.target.value })}
+                    className="w-full bg-black/50 border border-white/15 focus:border-[#D4AF37] rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs text-white/70 block mb-1.5 flex items-center gap-1.5">
+                    <Phone size={13} className="text-[#D4AF37]" /> Owner / Helpline WhatsApp Number
+                  </label>
+                  <input
+                    type="text"
+                    value={siteSettings.phone}
+                    onChange={(e) => setSiteSettings({ ...siteSettings, phone: e.target.value })}
+                    placeholder="03070769139"
+                    className="w-full bg-black/50 border border-white/15 focus:border-[#D4AF37] rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-white/70 block mb-1.5 flex items-center gap-1.5">
+                    <Mail size={13} className="text-[#D4AF37]" /> Official Email Address
+                  </label>
+                  <input
+                    type="email"
+                    value={siteSettings.email}
+                    onChange={(e) => setSiteSettings({ ...siteSettings, email: e.target.value })}
+                    placeholder="almadinarestaurant@gmail.com"
+                    className="w-full bg-black/50 border border-white/15 focus:border-[#D4AF37] rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs text-white/70 block mb-1.5 flex items-center gap-1.5">
+                    <Clock size={13} className="text-[#D4AF37]" /> Kitchen & Dining Timings
+                  </label>
+                  <input
+                    type="text"
+                    value={siteSettings.openingHours}
+                    onChange={(e) => setSiteSettings({ ...siteSettings, openingHours: e.target.value })}
+                    className="w-full bg-black/50 border border-white/15 focus:border-[#D4AF37] rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-white/70 block mb-1.5 flex items-center gap-1.5">
+                  <MapPin size={13} className="text-[#D4AF37]" /> Physical Branch Address
+                </label>
+                <input
+                  type="text"
+                  value={siteSettings.address}
+                  onChange={(e) => setSiteSettings({ ...siteSettings, address: e.target.value })}
+                  className="w-full bg-black/50 border border-white/15 focus:border-[#D4AF37] rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-white/70 block mb-1.5 flex items-center gap-1.5">
+                    <Bike size={13} className="text-[#D4AF37]" /> Delivery Fee (PKR)
+                  </label>
+                  <input
+                    type="number"
+                    value={siteSettings.deliveryFee}
+                    onChange={(e) => setSiteSettings({ ...siteSettings, deliveryFee: Number(e.target.value) })}
+                    className="w-full bg-black/50 border border-white/15 focus:border-[#D4AF37] rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs text-white/70 block mb-1.5 flex items-center gap-1.5">
+                    <DollarSign size={13} className="text-[#D4AF37]" /> Minimum Order Value (PKR)
+                  </label>
+                  <input
+                    type="number"
+                    value={siteSettings.minOrder}
+                    onChange={(e) => setSiteSettings({ ...siteSettings, minOrder: Number(e.target.value) })}
+                    className="w-full bg-black/50 border border-white/15 focus:border-[#D4AF37] rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-white/70 block mb-1.5 flex items-center gap-1.5">
+                  <Sparkles size={13} className="text-[#D4AF37]" /> Top Announcement Banner Text
+                </label>
+                <textarea
+                  rows={2}
+                  value={siteSettings.announcement}
+                  onChange={(e) => setSiteSettings({ ...siteSettings, announcement: e.target.value })}
+                  className="w-full bg-black/50 border border-white/15 focus:border-[#D4AF37] rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none resize-none"
+                  required
+                />
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  className="w-full py-3 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#F0DFA0] hover:brightness-110 text-black font-bold text-sm shadow-xl flex items-center justify-center gap-2 cursor-pointer transition-all"
+                >
+                  <Save size={16} /> Save Website Settings
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* ======================================================== */}
         {/* Supabase SQL Setup Modal */}
+        {/* ======================================================== */}
         {showSqlModal && (
           <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
             <div className="bg-[#121212] border border-[#D4AF37]/40 rounded-2xl max-w-xl w-full p-6 relative shadow-2xl">
@@ -677,7 +1626,7 @@ export default function AdminDashboard() {
                 </div>
                 <button
                   onClick={() => setShowSqlModal(false)}
-                  className="text-white/40 hover:text-white text-xs px-2 py-1 rounded"
+                  className="text-white/40 hover:text-white text-xs px-2 py-1 rounded cursor-pointer"
                 >
                   ✕ Close
                 </button>
@@ -695,7 +1644,7 @@ export default function AdminDashboard() {
                 </pre>
                 <button
                   onClick={handleCopySql}
-                  className="absolute top-2.5 right-2.5 inline-flex items-center gap-1.5 text-xs bg-[#D4AF37] hover:bg-[#F0DFA0] text-black font-semibold px-2.5 py-1 rounded-md transition-all shadow"
+                  className="absolute top-2.5 right-2.5 inline-flex items-center gap-1.5 text-xs bg-[#D4AF37] hover:bg-[#F0DFA0] text-black font-semibold px-2.5 py-1 rounded-md transition-all shadow cursor-pointer"
                 >
                   {copiedSql ? (
                     <>
@@ -720,7 +1669,7 @@ export default function AdminDashboard() {
 
               <button
                 onClick={() => setShowSqlModal(false)}
-                className="w-full text-center text-xs bg-white/10 hover:bg-white/20 text-white font-medium py-2 rounded-xl transition-all"
+                className="w-full text-center text-xs bg-white/10 hover:bg-white/20 text-white font-medium py-2 rounded-xl transition-all cursor-pointer"
               >
                 Theek Hai, Samajh Gaya
               </button>

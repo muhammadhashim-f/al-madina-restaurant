@@ -373,7 +373,7 @@ export default function Profile() {
               name="name"
               value={form.name}
               onChange={handleChange}
-              placeholder="e.g. Tariq Mehmood"
+              placeholder="Hakim Bhai"
               className="am-profile-input"
             />
           </div>
@@ -406,7 +406,7 @@ export default function Profile() {
                 name="phone"
                 value={form.phone}
                 onChange={handleChange}
-                placeholder="03XX-XXXXXXX"
+                placeholder="03070769139"
                 className="am-profile-input flex-1"
               />
               {(!verifiedPhone || form.phone !== verifiedPhone) && (

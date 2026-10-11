@@ -30,7 +30,7 @@ import { usePolicy } from "../context/PolicyContext";
 // ============================================================
 
 export const COUNTRIES = [
-  { code: "PK", name: "Pakistan", dialCode: "+92", flag: "🇵🇰", placeholder: "0307-0769139", example: "0307-0769139" },
+  { code: "PK", name: "Pakistan", dialCode: "+92", flag: "🇵🇰", placeholder: "03070769139", example: "03070769139" },
   { code: "AE", name: "UAE", dialCode: "+971", flag: "🇦🇪", placeholder: "050 123 4567", example: "050 123 4567" },
   { code: "SA", name: "Saudi Arabia", dialCode: "+966", flag: "🇸🇦", placeholder: "050 123 4567", example: "050 123 4567" },
   { code: "GB", name: "United Kingdom", dialCode: "+44", flag: "🇬🇧", placeholder: "07123 456789", example: "07123 456789" },
@@ -464,7 +464,7 @@ export default function Auth() {
               name="email"
               value={form.email}
               onChange={handleChange}
-              placeholder="info@almadina.pk"
+              placeholder="almadinarestaurant@gmail.com"
               className="am-auth-input"
               required
             />

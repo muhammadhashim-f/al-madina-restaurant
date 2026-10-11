@@ -283,11 +283,11 @@ export default function Checkout() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="am-co-label">Full name</label>
-                  <input type="text" name="name" value={form.name} onChange={handleChange} className="am-co-input" required />
+                  <input type="text" name="name" value={form.name} onChange={handleChange} placeholder="Hakim Bhai" className="am-co-input" required />
                 </div>
                 <div>
                   <label className="am-co-label">Phone number</label>
-                  <input type="tel" name="phone" value={form.phone} onChange={handleChange} className="am-co-input" required />
+                  <input type="tel" name="phone" value={form.phone} onChange={handleChange} placeholder="03070769139" className="am-co-input" required />
                 </div>
               </div>
 

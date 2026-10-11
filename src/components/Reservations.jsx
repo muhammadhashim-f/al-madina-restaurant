@@ -163,7 +163,7 @@ export default function Reservations() {
               name="name"
               value={form.name}
               onChange={handleChange}
-              placeholder="e.g. Ayesha Khan"
+              placeholder="Hakim Bhai"
               className="am-res-input"
               required
             />
@@ -176,7 +176,7 @@ export default function Reservations() {
               name="phone"
               value={form.phone}
               onChange={handleChange}
-              placeholder="03XX-XXXXXXX"
+              placeholder="03070769139"
               className="am-res-input"
               required
             />

@@ -221,7 +221,7 @@ export default function Footer() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="info@almadina.pk"
+                  placeholder="almadinarestaurant@gmail.com"
                   className="am-newsletter-input"
                   required
                 />

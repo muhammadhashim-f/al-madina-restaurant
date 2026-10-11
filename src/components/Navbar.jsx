@@ -250,17 +250,21 @@ export default function Navbar() {
           display: flex;
           align-items: center;
           overflow: hidden;
-          transition: width 0.35s ease, background 0.25s ease;
-          border-radius: var(--radius, 8px);
+          transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1), background 0.25s ease, border-color 0.25s ease;
+          border-radius: 9999px;
         }
         .am-search-wrap.closed {
           width: 40px;
+          height: 40px;
           background: transparent;
+          border: 1px solid transparent;
         }
         .am-search-wrap.open {
-          width: 200px;
-          background: rgba(255,255,255,0.08);
-          border: 1px solid rgba(212,175,55,0.4);
+          width: 250px;
+          height: 40px;
+          background: rgba(255,255,255,0.09);
+          border: 1px solid rgba(212,175,55,0.45);
+          box-shadow: 0 0 15px rgba(212,175,55,0.15);
         }
         .am-search-input {
           background: transparent;
@@ -269,10 +273,10 @@ export default function Navbar() {
           color: #FFFFFF;
           font-size: 13px;
           width: 100%;
-          padding: 0 8px;
+          padding: 0 10px 0 4px;
         }
         .am-search-input::placeholder {
-          color: rgba(255,255,255,0.5);
+          color: rgba(255,255,255,0.55);
         }
         .am-mobile-search {
           display: flex;
@@ -346,15 +350,30 @@ export default function Navbar() {
                   <Search size={19} className="am-white" />
                 </button>
                 {searchOpen && (
-                  <input
-                    autoFocus
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onBlur={handleSearchBlur}
-                    placeholder="Search dishes... (Enter)"
-                    className="am-search-input"
-                  />
+                  <>
+                    <input
+                      autoFocus
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onBlur={handleSearchBlur}
+                      placeholder="Search dishes... (Enter)"
+                      className="am-search-input"
+                    />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSearchQuery("");
+                          setSearchOpen(false);
+                        }}
+                        className="p-1 mr-2 text-white/50 hover:text-white cursor-pointer"
+                        title="Clear search"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </>
                 )}
               </form>
 

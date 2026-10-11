@@ -81,12 +81,17 @@ export async function saveChatMessage({
   saveLocalCache([cachedRow, ...currentCache]);
 
   try {
-    const { data, error } = await supabase.from(CHAT_TABLE_NAME).insert([row]).select();
-    if (error) {
-      console.warn("[ChatService] Supabase insert note:", error.message || error);
+    let result = await supabase.from(CHAT_TABLE_NAME).insert([row]).select();
+    if (result.error) {
+      // Try fallback table name chat_messages
+      const fallbackResult = await supabase.from("chat_messages").insert([row]).select();
+      if (!fallbackResult.error && fallbackResult.data) {
+        return { success: true, data: fallbackResult.data };
+      }
+      console.warn("[ChatService] Supabase insert note:", result.error.message || result.error);
       return { success: true, savedLocally: true, data: [cachedRow] };
     }
-    return { success: true, data };
+    return { success: true, data: result.data };
   } catch (err) {
     console.warn("[ChatService] Network error saving chat to Supabase, saved locally:", err);
     return { success: true, savedLocally: true, data: [cachedRow] };
@@ -98,10 +103,22 @@ export async function saveChatMessage({
  */
 export async function fetchCustomerChats() {
   try {
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from(CHAT_TABLE_NAME)
       .select("*")
       .order("created_at", { ascending: false });
+
+    // If customer_chats is empty or errored, try chat_messages table
+    if ((error || !data || data.length === 0) && supabase) {
+      const fallback = await supabase
+        .from("chat_messages")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (!fallback.error && fallback.data && fallback.data.length > 0) {
+        data = fallback.data;
+        error = null;
+      }
+    }
 
     if (error || !data || data.length === 0) {
       // Fallback to local cache if table not created yet or empty

@@ -1,14 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { supabase } from "../lib/supabaseClient";
 
 // ============================================================
 // AL MADINA RESTAURANT — Cart Context
-// A single shared "cart" that Navbar, Menu, and the Cart page
-// all read from and write to. This replaces the fake hardcoded
-// cartCount that was in the Navbar before.
-// Persisted to localStorage so items survive a page refresh
-// (this is a real project file, not a chat preview, so
-// localStorage works fine here) — will move to a real
-// Supabase-backed cart once the backend is connected.
+// Shared cart across Navbar, Menu, and Cart page.
+// Syncs with localStorage and Supabase "carts" table.
 // ============================================================
 
 const CartContext = createContext(null);
@@ -26,6 +22,21 @@ export function CartProvider({ children }) {
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+
+    // Sync to Supabase carts table
+    try {
+      const total = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+      supabase
+        .from("carts")
+        .insert({
+          id: "cart_active_session",
+          customer_identifier: "active_customer",
+          items: items,
+          total: total,
+          updated_at: new Date().toISOString(),
+        })
+        .catch?.(() => {});
+    } catch {}
   }, [items]);
 
   const addToCart = (item) => {

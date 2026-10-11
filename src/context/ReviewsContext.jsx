@@ -1,10 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { supabase } from "../lib/supabaseClient";
 
 // ============================================================
 // AL MADINA RESTAURANT — Reviews Context
-// Stores customer reviews (name, rating, comment). Persisted to
-// localStorage for now — will move to a Supabase "reviews" table
-// (with admin moderation) once the backend is connected.
+// Stores customer reviews (name, rating, comment) and syncs with
+// Supabase "reviews" table.
 // ============================================================
 
 const ReviewsContext = createContext(null);
@@ -26,6 +26,37 @@ export function ReviewsProvider({ children }) {
     }
   });
 
+  // Fetch reviews from Supabase on mount
+  useEffect(() => {
+    let isMounted = true;
+    const fetchSupabaseReviews = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("reviews")
+          .select("*")
+          .order("created_at", { ascending: false });
+
+        if (!error && data && data.length > 0 && isMounted) {
+          const mapped = data.map((d) => ({
+            id: d.id,
+            name: d.name,
+            rating: Number(d.rating),
+            comment: d.comment,
+            date: d.date || (d.created_at ? d.created_at.slice(0, 10) : new Date().toISOString().slice(0, 10)),
+          }));
+          setReviews(mapped);
+        }
+      } catch (err) {
+        console.warn("[ReviewsContext] Supabase fetch fallback:", err);
+      }
+    };
+
+    fetchSupabaseReviews();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(reviews));
   }, [reviews]);
@@ -37,16 +68,48 @@ export function ReviewsProvider({ children }) {
       ...review,
     };
     setReviews((prev) => [newReview, ...prev]);
+
+    // Async sync to Supabase
+    try {
+      supabase
+        .from("reviews")
+        .insert({
+          name: newReview.name,
+          rating: Number(newReview.rating),
+          comment: newReview.comment,
+          date: newReview.date,
+        })
+        .catch?.((e) => console.warn("[ReviewsContext] Supabase insert note:", e));
+    } catch {}
   };
 
   const updateReview = (id, updatedFields) => {
     setReviews((prev) =>
       prev.map((r) => (r.id === id ? { ...r, ...updatedFields } : r))
     );
+
+    try {
+      supabase
+        .from("reviews")
+        .update({
+          ...updatedFields,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", id)
+        .catch?.((e) => console.warn("[ReviewsContext] Supabase update note:", e));
+    } catch {}
   };
 
   const deleteReview = (id) => {
     setReviews((prev) => prev.filter((r) => r.id !== id));
+
+    try {
+      supabase
+        .from("reviews")
+        .delete()
+        .eq("id", id)
+        .catch?.((e) => console.warn("[ReviewsContext] Supabase delete note:", e));
+    } catch {}
   };
 
   const averageRating =

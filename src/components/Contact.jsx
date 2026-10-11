@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { MapPin, Phone, Mail, Clock, Send, Navigation, Share2, CheckCircle2, ShieldCheck } from "lucide-react";
+import { MapPin, Phone, Mail, Clock, Send, Navigation, Share2 } from "lucide-react";
 import { RESTAURANT_PHONE } from "../utils/whatsapp";
 
 // ============================================================
@@ -226,7 +226,7 @@ export default function Contact() {
                 name="name"
                 value={form.name}
                 onChange={handleChange}
-                placeholder="e.g. Tariq Mehmood"
+                placeholder="Hakim Bhai"
                 className="am-input"
                 required
               />
@@ -238,7 +238,7 @@ export default function Contact() {
                 name="email"
                 value={form.email}
                 onChange={handleChange}
-                placeholder="customer@example.com"
+                placeholder="almadinarestaurant@gmail.com"
                 className="am-input"
                 required
               />
