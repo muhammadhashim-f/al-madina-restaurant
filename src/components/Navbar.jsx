@@ -51,8 +51,12 @@ export default function Navbar() {
     };
     if (profileOpen) {
       document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("touchstart", handleClickOutside);
     }
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
   }, [profileOpen]);
 
   const handleSearch = (e) => {
@@ -449,39 +453,43 @@ export default function Navbar() {
                   </button>
                   {profileOpen && (
                     <div className="am-mobile-panel absolute right-0 mt-2 w-48 bg-[#181818] border border-white/10 rounded-lg shadow-xl py-2 text-sm z-50">
-                      <a
-                        href="/profile"
-                        onClick={(e) => {
+                      <button
+                        type="button"
+                        onClick={() => {
                           setProfileOpen(false);
-                          handleActionNav(e, "/profile", "👤 Al Madina Profile", "Aapka personal shahi profile load ho raha hai...", 1500);
+                          navigate("/profile");
                         }}
-                        className="block px-4 py-2 text-white hover:bg-white/10 transition-colors"
+                        className="w-full text-left block px-4 py-2 text-white hover:bg-white/10 transition-colors cursor-pointer"
                       >
                         My Profile
-                      </a>
-                      <a
-                        href="/orders"
-                        onClick={(e) => {
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
                           setProfileOpen(false);
-                          handleActionNav(e, "/orders", "📦 Shahi Order History", "Aapke pichle orders ki tafseelat...", 1600);
+                          navigate("/orders");
                         }}
-                        className="block px-4 py-2 text-white hover:bg-white/10 transition-colors"
+                        className="w-full text-left block px-4 py-2 text-white hover:bg-white/10 transition-colors cursor-pointer"
                       >
                         Order History
-                      </a>
-                      <a
-                        href="/reservations"
-                        onClick={(e) => {
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
                           setProfileOpen(false);
-                          handleActionNav(e, "/reservations", "🍽️ Table Reservations", "VIP family seating status...", 1600);
+                          navigate("/reservations");
                         }}
-                        className="block px-4 py-2 text-white hover:bg-white/10 transition-colors"
+                        className="w-full text-left block px-4 py-2 text-white hover:bg-white/10 transition-colors cursor-pointer"
                       >
                         Reservations
-                      </a>
+                      </button>
                       <div className="my-1 border-t border-white/10" />
                       <button
-                        onClick={handleLogout}
+                        type="button"
+                        onClick={() => {
+                          setProfileOpen(false);
+                          handleLogout();
+                        }}
                         className="w-full text-left block px-4 py-2 text-[#E8846A] hover:bg-white/10 transition-colors cursor-pointer"
                       >
                         Log out

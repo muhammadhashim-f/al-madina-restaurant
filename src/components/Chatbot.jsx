@@ -567,16 +567,41 @@ export default function Chatbot() {
       clean.includes("family hall");
 
     if (isTableBookingIntent) {
+      const hasSpecificDetails =
+        clean.includes("afraad") ||
+        clean.includes("guest") ||
+        clean.includes("people") ||
+        clean.includes("person") ||
+        clean.includes("banday") ||
+        clean.includes("kal") ||
+        clean.includes("aaj") ||
+        clean.includes("confirm") ||
+        clean.includes("kar do") ||
+        clean.includes("kr do") ||
+        clean.includes("bhej do");
+
+      if (!hasSpecificDetails) {
+        return {
+          text: `👑 Al Madina VIP Seating Reservation keliye darj zail maaloomaat zaroori hain:\n\n1. 👥 **Afraad (Guests):** Kitne afraad tashreef la rahe hain? (Maslan: 2, 4, ya 6 family members)\n2. 📅 **Tareeq & Waqt:** Kis din aur kis waqt tashreef laenge? (Maslan: Kal raat 8:30 PM)\n3. 👤 **Mehmaan ka Naam & Rabta Number:**\n\nAap ye details yahan bata dein, main VIP Family Hall mein shahi dastarkhwan mehfooz kar doonga!`,
+          suggestedQuestions: [
+            "👥 4 Afraad keliye Kal Raat 8:30 PM Table Book Karein",
+            "👥 2 Afraad keliye Table Chahiye",
+            "👨‍👩‍👧‍👦 6 Afraad Family Hall Seating",
+          ],
+        };
+      }
+
       let guests = 2;
       const guestMatch = clean.match(/(\d+)\s*(afraad|people|persons|guest|guests|banday)/);
       if (guestMatch) guests = parseInt(guestMatch[1], 10);
       else if (clean.includes("char") || clean.includes("4")) guests = 4;
-      else if (clean.includes("family")) guests = 6;
+      else if (clean.includes("family") || clean.includes("chhe") || clean.includes("6")) guests = 6;
+      else if (clean.includes("teen") || clean.includes("3")) guests = 3;
 
       const tomorrow = new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString().slice(0, 10);
       const newBooking = addReservation({
         name: customerName,
-        phone: "03070769139",
+        phone: "0300-1234567",
         date: tomorrow,
         time: "20:30",
         guests,
@@ -604,10 +629,39 @@ export default function Chatbot() {
       clean.includes("order bhej do") ||
       clean.includes("order book") ||
       clean.includes("order dena") ||
+      clean.includes("order karna") ||
+      clean.includes("order krna") ||
       clean.includes("mangwa do") ||
-      clean.includes("delivery bhej do");
+      clean.includes("delivery bhej do") ||
+      clean.includes("order lagwa do");
 
     if (isDirectOrderIntent) {
+      const hasSpecificOrderDetails =
+        cartItems?.length > 0 ||
+        clean.includes("mutton") ||
+        clean.includes("biryani") ||
+        clean.includes("karahi") ||
+        clean.includes("kebab") ||
+        clean.includes("samosa") ||
+        clean.includes("address") ||
+        clean.includes("korangi") ||
+        clean.includes("sector") ||
+        clean.includes("confirm") ||
+        clean.includes("kar do") ||
+        clean.includes("kr do") ||
+        clean.includes("bhej do");
+
+      if (!hasSpecificOrderDetails) {
+        return {
+          text: `👑 Al Madina Shahi Kitchen Order keliye darj zail tafseelat zaroori hain:\n\n1. 🍲 **Dishes & Miqdaar:** Konsi dishes mangwana chahte hain? (Maslan: 1 KG Mutton Karahi, 2x Chicken Biryani, Seekh Kebab)\n2. 📍 **Karachi Delivery Address:** Sector / Area / Street ka mukammal pata?\n3. 📱 **Rabta Number:** Rider aur WhatsApp confirmation keliye mobile number.\n\nAap ye details yahan likh dein ya Menu se **Add to Cart** kar ke 'Order Confirm' farmayein, main foran order generate kar doonga!`,
+          suggestedQuestions: [
+            "🍛 2x Chicken Biryani + 1x Mutton Karahi Mangwa Do",
+            "📦 Mera Cart Order Confirm Karein",
+            "Mera Address: Sector 36-B, Korangi, Karachi",
+          ],
+        };
+      }
+
       const orderItems =
         cartItems?.length > 0
           ? cartItems
@@ -624,14 +678,14 @@ export default function Chatbot() {
         status: "awaiting_approval", // Pending owner WhatsApp confirmation!
         customer: {
           name: customerName,
-          phone: "03070769139",
-          address: "Karachi Home Delivery (Awaiting WhatsApp confirmation)",
+          phone: "0300-1234567",
+          address: "Sector 36-B, Korangi, Karachi",
         },
         total: orderTotal,
       });
 
       return {
-        text: `Bhai order complete successfully ho chuka hy ab aap whatsapp (${RESTAURANT_PHONE} / +92 307 0769139) pr payment wageera okay kare pir jese hi owner ki trf se okay ka massge ay ga to pir apko tarcking baick website pr live location me show ki jay gi k kahan Aap ka parsal aa giya hy 🛵\n\n(Bhai yaad rahe k jb tk ownr okay nahi kare ga tb tk baick tracking me show nahi ki jay gi k kahan aa gai kun k abhi order pendding me hy).`,
+        text: `bhai order complete successfully ho chuka hy ab aap whatsap (${RESTAURANT_PHONE} / +92 300 1234567) pr payment wageera okay kare pir jese hi owner ki trf se okay ka massge ay ga to pir apko tarcking baick website pr live location me show ki jay gi k kahan Aap ka parsal aa giya hy 🛵\n\n(Bhai yaad rahe k jb tk ownr okay nahi kare ga tb tk baick tracking me show nahi ki jay gi k kahan aa gai kun k abhi order pendding me hy).`,
         orderPlaced: newOrder,
         whatsappSupport: true,
         suggestedQuestions: [
@@ -920,9 +974,41 @@ export default function Chatbot() {
 
   // Archive / Unarchive toggle
   const handleArchiveChat = (chatId) => {
-    setSessions((prev) =>
-      prev.map((s) => (s.id === chatId ? { ...s, archived: !s.archived } : s))
-    );
+    setSessions((prev) => {
+      const target = prev.find((s) => s.id === chatId);
+      if (!target) return prev;
+      const willBeArchived = !target.archived;
+      const updated = prev.map((s) => (s.id === chatId ? { ...s, archived: willBeArchived } : s));
+
+      if (willBeArchived) {
+        const remainingActive = updated.filter((s) => !s.trash && !s.archived);
+        if (currentChatId === chatId) {
+          if (remainingActive.length > 0) {
+            setCurrentChatId(remainingActive[0].id);
+          } else {
+            const freshId = "chat_" + Date.now();
+            const freshChat = {
+              id: freshId,
+              title: "New Chat",
+              archived: false,
+              trash: false,
+              createdAt: Date.now(),
+              messages: [INITIAL_MESSAGE],
+            };
+            setCurrentChatId(freshId);
+            return [freshChat, ...updated];
+          }
+        }
+      } else {
+        // Unarchived: bring to top of active chats!
+        const restored = { ...target, archived: false, trash: false };
+        const others = updated.filter((s) => s.id !== chatId);
+        setCurrentChatId(chatId);
+        setSidebarTab("active");
+        return [restored, ...others];
+      }
+      return updated;
+    });
   };
 
   // Move chat to Trash
@@ -1145,6 +1231,7 @@ export default function Chatbot() {
         }
         .am-typing-dots span:nth-child(2) { animation-delay: 0.2s; }
         .am-typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+        .am-typing-dots span:nth-child(4) { animation-delay: 0.6s; }
         @keyframes am-dot-pulse {
           0%, 80%, 100% { transform: scale(0.6); opacity: 0.35; }
           40% { transform: scale(1.25); opacity: 1; }
@@ -1635,19 +1722,23 @@ export default function Chatbot() {
               </div>
             )}
 
-            {/* Typing Indicator with Animated Restaurant Logo & Dots */}
+            {/* Typing Indicator with Animated Royal Logo & 4 VIP Dots */}
             {isTyping && (
               <div className="am-typing-indicator-box animate-fade-in my-1">
-                <img
-                  src="/Images/logo/almadina.png"
-                  alt="Al Madina"
-                  className="am-typing-logo"
-                  onError={(e) => {
-                    // Fallback to stylized gold badge if image loading delay
-                    e.target.style.display = 'none';
-                  }}
-                />
+                <div className="w-6 h-6 rounded-full bg-black/80 border border-[#D4AF37] flex items-center justify-center p-0.5 shrink-0 shadow-[0_0_8px_rgba(212,175,55,0.6)] animate-[am-logo-spin_3s_linear_infinite]">
+                  <svg width="18" height="18" viewBox="0 0 38 38" fill="none">
+                    <path
+                      d="M6 32 V19 C6 11.8 11.8 6 19 6 C26.2 6 32 11.8 32 19 V32 H6 Z"
+                      stroke="#D4AF37"
+                      strokeWidth="2.4"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <circle cx="19" cy="17" r="3.4" fill="#FFF2A3" />
+                  </svg>
+                </div>
                 <div className="am-typing-dots">
+                  <span />
                   <span />
                   <span />
                   <span />

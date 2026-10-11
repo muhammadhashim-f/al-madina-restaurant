@@ -20,10 +20,10 @@ export default function NetworkSpeedLoader() {
     setShowNotification(true);
 
     if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
-    // Auto-hide after 3.8 seconds so it doesn't linger or block the screen
+    // Auto-hide after 3.2 seconds so it doesn't linger or block the screen
     autoHideTimerRef.current = setTimeout(() => {
       setShowNotification(false);
-    }, 3800);
+    }, 3200);
   };
 
   useEffect(() => {
@@ -102,7 +102,7 @@ export default function NetworkSpeedLoader() {
         </p>
 
         <div className="w-full bg-white/10 h-1 rounded-full mt-3 overflow-hidden">
-          <div className="bg-amber-400 h-full w-full animate-[shrink_3.8s_linear_forwards]" />
+          <div className="bg-amber-400 h-full w-full animate-[shrink_3.2s_linear_forwards]" />
         </div>
       </div>
     </div>

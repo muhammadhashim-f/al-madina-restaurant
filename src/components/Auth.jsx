@@ -12,6 +12,8 @@ import {
   ShieldCheck,
   CheckCircle2,
   AlertCircle,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useVIPLoader } from "../context/LoadingContext";
@@ -213,6 +215,15 @@ export default function Auth() {
     setLoading(false);
     setGoogleModal(false);
     navigate(redirectTarget, { replace: true });
+  };
+
+  const handleRemoveAccount = (e, emailToRemove) => {
+    e.stopPropagation();
+    const updated = savedAccounts.filter((a) => a.email.toLowerCase() !== emailToRemove.toLowerCase());
+    setSavedAccounts(updated);
+    try {
+      localStorage.setItem("am_saved_google_accounts", JSON.stringify(updated));
+    } catch {}
   };
 
   return (
@@ -667,19 +678,29 @@ export default function Auth() {
                 <p className="text-xs text-white/70 mb-2.5">Saved accounts on this device:</p>
                 <div className="space-y-2">
                   {/* Show primary/recent account */}
-                  <button
-                    type="button"
-                    onClick={() => handleSelectGoogleAccount(savedAccounts[0].email, savedAccounts[0].name)}
-                    className="w-full flex items-center gap-3 p-3 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-[#D4AF37]/50 rounded-xl text-left transition-all cursor-pointer"
-                  >
-                    <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-emerald-700 to-teal-500 text-white font-bold flex items-center justify-center text-sm shrink-0">
-                      {savedAccounts[0].name ? savedAccounts[0].name[0].toUpperCase() : "G"}
-                    </div>
-                    <div className="overflow-hidden flex-1">
-                      <p className="text-sm text-white font-medium truncate">{savedAccounts[0].email}</p>
-                      <p className="text-xs text-white/40">{savedAccounts[0].name || "Google Account"}</p>
-                    </div>
-                  </button>
+                  <div className="w-full flex items-center justify-between gap-2 p-3 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-[#D4AF37]/50 rounded-xl transition-all">
+                    <button
+                      type="button"
+                      onClick={() => handleSelectGoogleAccount(savedAccounts[0].email, savedAccounts[0].name)}
+                      className="flex-1 flex items-center gap-3 text-left cursor-pointer overflow-hidden"
+                    >
+                      <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-emerald-700 to-teal-500 text-white font-bold flex items-center justify-center text-sm shrink-0">
+                        {savedAccounts[0].name ? savedAccounts[0].name[0].toUpperCase() : "G"}
+                      </div>
+                      <div className="overflow-hidden flex-1">
+                        <p className="text-sm text-white font-medium truncate">{savedAccounts[0].email}</p>
+                        <p className="text-xs text-white/40">{savedAccounts[0].name || "Google Account"}</p>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => handleRemoveAccount(e, savedAccounts[0].email)}
+                      className="p-1.5 text-white/40 hover:text-red-400 rounded-lg hover:bg-white/5 cursor-pointer shrink-0"
+                      title="Is browser se remove karein"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
 
                   {/* More accounts if multiple exist on this device */}
                   {savedAccounts.length > 1 && (
@@ -687,20 +708,32 @@ export default function Auth() {
                       {showMoreAccounts && (
                         <div className="space-y-2 pt-1">
                           {savedAccounts.slice(1).map((acc, idx) => (
-                            <button
+                            <div
                               key={idx}
-                              type="button"
-                              onClick={() => handleSelectGoogleAccount(acc.email, acc.name)}
-                              className="w-full flex items-center gap-3 p-3 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-[#D4AF37]/50 rounded-xl text-left transition-all cursor-pointer"
+                              className="w-full flex items-center justify-between gap-2 p-3 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-[#D4AF37]/50 rounded-xl transition-all"
                             >
-                              <div className="w-9 h-9 rounded-full bg-[#D4AF37] text-black font-bold flex items-center justify-center text-sm shrink-0">
-                                {acc.name ? acc.name[0].toUpperCase() : "G"}
-                              </div>
-                              <div className="overflow-hidden flex-1">
-                                <p className="text-sm text-white font-medium truncate">{acc.email}</p>
-                                <p className="text-xs text-white/40">{acc.name || "Google Account"}</p>
-                              </div>
-                            </button>
+                              <button
+                                type="button"
+                                onClick={() => handleSelectGoogleAccount(acc.email, acc.name)}
+                                className="flex-1 flex items-center gap-3 text-left cursor-pointer overflow-hidden"
+                              >
+                                <div className="w-9 h-9 rounded-full bg-[#D4AF37] text-black font-bold flex items-center justify-center text-sm shrink-0">
+                                  {acc.name ? acc.name[0].toUpperCase() : "G"}
+                                </div>
+                                <div className="overflow-hidden flex-1">
+                                  <p className="text-sm text-white font-medium truncate">{acc.email}</p>
+                                  <p className="text-xs text-white/40">{acc.name || "Google Account"}</p>
+                                </div>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => handleRemoveAccount(e, acc.email)}
+                                className="p-1.5 text-white/40 hover:text-red-400 rounded-lg hover:bg-white/5 cursor-pointer shrink-0"
+                                title="Is browser se remove karein"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
                           ))}
                         </div>
                       )}

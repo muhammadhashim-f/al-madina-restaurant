@@ -361,9 +361,9 @@ export default function AdminDashboard() {
     } else {
       // Default sample customer if empty
       list.push({
-        name: "Hakim Bhai",
-        email: "ah1572986@gmail.com",
-        phone: "03070769139",
+        name: "VIP Customer",
+        email: "customer@almadina.pk",
+        phone: "03001234567",
         address: "Sector 36-B, Korangi, Karachi",
         orders: orders,
         cart: globalCartItems,
