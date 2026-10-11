@@ -647,7 +647,6 @@ export default function Chatbot() {
 
     // Determine relevant dish attachment for interactive card
     let matchedProduct = null;
-    const lowerRaw = raw.toLowerCase();
     const isMuttonInquiry =
       clean.includes("mutton") ||
       clean.includes("bakra") ||
