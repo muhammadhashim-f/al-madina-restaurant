@@ -1,5 +1,21 @@
 @import "tailwindcss";
 
+/* Global Base Styles */
+html, body {
+  background-color: #0A0A0A;
+  color: #FFFFFF;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  overflow-x: hidden;
+  font-family: 'Work Sans', system-ui, -apple-system, sans-serif;
+}
+
+#root {
+  min-height: 100vh;
+  background-color: #0A0A0A;
+}
+
 /* ============================================================
    AL MADINA RESTAURANT — 3D & SCROLL ANIMATION SUITE
    Includes 3D perspective transforms, left & right scroll reveals,
@@ -12,43 +28,14 @@
   transform-style: preserve-3d;
 }
 
-/* Scroll Reveal: 3D Left entrance */
-.reveal-left {
-  opacity: 0;
-  transform: perspective(1200px) rotateY(-22deg) translateX(-80px) scale(0.95);
-  transition: opacity 0.85s cubic-bezier(0.16, 1, 0.3, 1), transform 0.85s cubic-bezier(0.16, 1, 0.3, 1);
-  will-change: transform, opacity;
-}
-
-.reveal-left.revealed {
-  opacity: 1;
-  transform: perspective(1200px) rotateY(0deg) translateX(0) scale(1);
-}
-
-/* Scroll Reveal: 3D Right entrance */
-.reveal-right {
-  opacity: 0;
-  transform: perspective(1200px) rotateY(22deg) translateX(80px) scale(0.95);
-  transition: opacity 0.85s cubic-bezier(0.16, 1, 0.3, 1), transform 0.85s cubic-bezier(0.16, 1, 0.3, 1);
-  will-change: transform, opacity;
-}
-
-.reveal-right.revealed {
-  opacity: 1;
-  transform: perspective(1200px) rotateY(0deg) translateX(0) scale(1);
-}
-
-/* Scroll Reveal: 3D Upward entrance */
+/* Scroll Reveal: Visible by default so if iframe/observer delays, content is NEVER blank */
+.reveal-left,
+.reveal-right,
 .reveal-3d-up {
-  opacity: 0;
-  transform: perspective(1200px) rotateX(20deg) translateY(60px) scale(0.94);
-  transition: opacity 0.85s cubic-bezier(0.16, 1, 0.3, 1), transform 0.85s cubic-bezier(0.16, 1, 0.3, 1);
-  will-change: transform, opacity;
-}
-
-.reveal-3d-up.revealed {
   opacity: 1;
-  transform: perspective(1200px) rotateX(0deg) translateY(0) scale(1);
+  transform: none;
+  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
 }
 
 /* Interactive 3D Card Hover Tilt */

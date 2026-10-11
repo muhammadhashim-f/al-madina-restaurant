@@ -177,6 +177,27 @@ function createMockSupabaseClient() {
         select(_cols = "*") {
           return builder;
         },
+        upsert(rowsToUpsert, _options = {}) {
+          const toAdd = Array.isArray(rowsToUpsert) ? rowsToUpsert : [rowsToUpsert];
+          const existing = getRows();
+          const updated = [...existing];
+          toAdd.forEach((item) => {
+            const idx = updated.findIndex((r) => r.id === item.id);
+            if (idx >= 0) {
+              updated[idx] = { ...updated[idx], ...item };
+            } else {
+              updated.unshift({
+                id: item.id || `row_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+                created_at: item.created_at || new Date().toISOString(),
+                ...item,
+              });
+            }
+          });
+          saveRows(updated);
+          const p = Promise.resolve({ data: toAdd, error: null });
+          p.select = () => p;
+          return p;
+        },
         insert(rowsToInsert) {
           const toAdd = Array.isArray(rowsToInsert) ? rowsToInsert : [rowsToInsert];
           const enriched = toAdd.map((r) => ({
@@ -187,14 +208,18 @@ function createMockSupabaseClient() {
           const existing = getRows();
           const updated = [...enriched, ...existing];
           saveRows(updated);
-          return Promise.resolve({ data: enriched, error: null });
+          const p = Promise.resolve({ data: enriched, error: null });
+          p.select = () => p;
+          return p;
         },
         update(updates) {
           return {
             eq(col, val) {
               const rows = getRows().map((r) => (r[col] === val ? { ...r, ...updates } : r));
               saveRows(rows);
-              return Promise.resolve({ data: rows, error: null });
+              const p = Promise.resolve({ data: rows, error: null });
+              p.select = () => p;
+              return p;
             },
           };
         },
@@ -207,7 +232,9 @@ function createMockSupabaseClient() {
             const before = getRows();
             const filtered = before.filter((r) => r[col] !== val);
             saveRows(filtered);
-            return Promise.resolve({ data: filtered, error: null });
+            const p = Promise.resolve({ data: filtered, error: null });
+            p.select = () => p;
+            return p;
           }
           currentRows = currentRows.filter((r) => r[col] === val);
           return builder;
@@ -224,8 +251,11 @@ function createMockSupabaseClient() {
         single() {
           return Promise.resolve({ data: currentRows[0] || null, error: null });
         },
-        then(resolve) {
-          return Promise.resolve({ data: currentRows, error: null }).then(resolve);
+        then(resolve, reject) {
+          return Promise.resolve({ data: currentRows, error: null }).then(resolve, reject);
+        },
+        catch(reject) {
+          return Promise.resolve({ data: currentRows, error: null }).catch(reject);
         },
       };
       return builder;

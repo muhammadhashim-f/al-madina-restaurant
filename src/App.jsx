@@ -1,5 +1,39 @@
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
-import { useEffect } from 'react';
+
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error("Al Madina Application Error:", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ minHeight: "100vh", backgroundColor: "#0A0A0A", color: "#FFFFFF", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "20px", textAlign: "center" }}>
+          <h2 style={{ fontFamily: "'Amiri', serif", fontSize: "28px", color: "#D4AF37", marginBottom: "12px" }}>
+            Al Madina Restaurant
+          </h2>
+          <p style={{ fontSize: "14px", color: "rgba(255,255,255,0.7)", maxWidth: "400px", marginBottom: "20px" }}>
+            Website reload karne ki zaroorat hai. Barah-e-karam page ko refresh karein.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            style={{ padding: "10px 24px", background: "linear-gradient(135deg, #D4AF37, #F0DFA0)", color: "#000", fontWeight: "bold", borderRadius: "10px", border: "none", cursor: "pointer" }}
+          >
+            Reload Website
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 import { CartProvider } from './context/CartContext';
 import { OrdersProvider } from './context/OrdersContext';
@@ -116,45 +150,47 @@ function HomePage() {
 
 function App() {
   return (
-    <LoadingProvider>
-      <CartProvider>
-        <OrdersProvider>
-          <FavoritesProvider>
-            <ReviewsProvider>
-              <ReservationsProvider>
-                <PolicyProvider>
-                  <BrowserRouter>
-                    <ScrollProgressBar />
-                    <Navbar />
-                    <ScrollToHash />
-                    <ScrollWatcher />
-                    <Routes>
-                      <Route path="/" element={<HomePage />} />
-                      <Route path="/login" element={<Auth />} />
-                      <Route path="/signup" element={<Auth />} />
-                      <Route path="/auth" element={<Auth />} />
-                      <Route path="/reservations" element={<Reservations />} />
-                      <Route path="/cart" element={<Cart />} />
-                      <Route path="/checkout" element={<Checkout />} />
-                      <Route path="/orders" element={<OrderHistory />} />
-                      <Route path="/profile" element={<Profile />} />
-                      <Route path="/favorites" element={<Favorites />} />
-                      <Route path="/forgot-password" element={<ForgotPassword />} />
-                      <Route path="/track/:orderId" element={<Tracking />} />
-                      <Route path="/admin/login" element={<AdminLogin />} />
-                      <Route path="/admin/dashboard" element={<AdminDashboard />} />
-                    </Routes>
-                    <Chatbot />
-                    <NetworkSpeedLoader />
-                    <Footer />
-                  </BrowserRouter>
-                </PolicyProvider>
-              </ReservationsProvider>
-            </ReviewsProvider>
-          </FavoritesProvider>
-        </OrdersProvider>
-      </CartProvider>
-    </LoadingProvider>
+    <ErrorBoundary>
+      <LoadingProvider>
+        <CartProvider>
+          <OrdersProvider>
+            <FavoritesProvider>
+              <ReviewsProvider>
+                <ReservationsProvider>
+                  <PolicyProvider>
+                    <BrowserRouter>
+                      <ScrollProgressBar />
+                      <Navbar />
+                      <ScrollToHash />
+                      <ScrollWatcher />
+                      <Routes>
+                        <Route path="/" element={<HomePage />} />
+                        <Route path="/login" element={<Auth />} />
+                        <Route path="/signup" element={<Auth />} />
+                        <Route path="/auth" element={<Auth />} />
+                        <Route path="/reservations" element={<Reservations />} />
+                        <Route path="/cart" element={<Cart />} />
+                        <Route path="/checkout" element={<Checkout />} />
+                        <Route path="/orders" element={<OrderHistory />} />
+                        <Route path="/profile" element={<Profile />} />
+                        <Route path="/favorites" element={<Favorites />} />
+                        <Route path="/forgot-password" element={<ForgotPassword />} />
+                        <Route path="/track/:orderId" element={<Tracking />} />
+                        <Route path="/admin/login" element={<AdminLogin />} />
+                        <Route path="/admin/dashboard" element={<AdminDashboard />} />
+                      </Routes>
+                      <Chatbot />
+                      <NetworkSpeedLoader />
+                      <Footer />
+                    </BrowserRouter>
+                  </PolicyProvider>
+                </ReservationsProvider>
+              </ReviewsProvider>
+            </FavoritesProvider>
+          </OrdersProvider>
+        </CartProvider>
+      </LoadingProvider>
+    </ErrorBoundary>
   );
 }
 
