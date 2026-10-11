@@ -15,7 +15,7 @@ import { flyToCart } from "../utils/flyToCart";
 
 const CATEGORIES = ["All", "👑 VIP Selection", "Starters", "Mains", "Desserts", "Drinks"];
 
-const MENU_ITEMS = [
+export const MENU_ITEMS = [
   // VIP Signature Collection
   {
     id: 101,

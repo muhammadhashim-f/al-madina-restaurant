@@ -28,14 +28,33 @@ html, body {
   transform-style: preserve-3d;
 }
 
-/* Scroll Reveal: Visible by default so if iframe/observer delays, content is NEVER blank */
-.reveal-left,
-.reveal-right,
-.reveal-3d-up {
-  opacity: 1;
-  transform: none;
-  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+/* Scroll Reveal: 3D VIP animations from left, right, and up */
+.reveal-left {
+  opacity: 0;
+  transform: perspective(1200px) translateX(-70px) rotateY(-14deg) scale(0.96);
+  transition: opacity 0.85s cubic-bezier(0.16, 1, 0.3, 1), transform 0.85s cubic-bezier(0.16, 1, 0.3, 1);
   will-change: transform, opacity;
+}
+
+.reveal-right {
+  opacity: 0;
+  transform: perspective(1200px) translateX(70px) rotateY(14deg) scale(0.96);
+  transition: opacity 0.85s cubic-bezier(0.16, 1, 0.3, 1), transform 0.85s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
+}
+
+.reveal-3d-up {
+  opacity: 0;
+  transform: perspective(1200px) translateY(55px) rotateX(12deg) scale(0.96);
+  transition: opacity 0.85s cubic-bezier(0.16, 1, 0.3, 1), transform 0.85s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
+}
+
+.reveal-left.revealed,
+.reveal-right.revealed,
+.reveal-3d-up.revealed {
+  opacity: 1 !important;
+  transform: perspective(1200px) translateX(0) translateY(0) rotateX(0deg) rotateY(0deg) scale(1) !important;
 }
 
 /* Interactive 3D Card Hover Tilt */

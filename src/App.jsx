@@ -93,22 +93,26 @@ function ScrollWatcher() {
   const location = useLocation();
 
   useEffect(() => {
-    const observeTargets = () => {
+    let observer = null;
+
+    const checkAndReveal = () => {
       const targets = document.querySelectorAll('.reveal-left, .reveal-right, .reveal-3d-up');
-      const observer = new IntersectionObserver(
+      if (observer) observer.disconnect();
+
+      observer = new IntersectionObserver(
         (entries) => {
           entries.forEach((entry) => {
             if (entry.isIntersecting) {
               entry.target.classList.add('revealed');
             } else {
               const rect = entry.target.getBoundingClientRect();
-              if (rect.top > window.innerHeight * 1.05 || rect.bottom < -60) {
+              if (rect.top > window.innerHeight * 1.1 || rect.bottom < -80) {
                 entry.target.classList.remove('revealed');
               }
             }
           });
         },
-        { threshold: 0.1, rootMargin: '0px 0px -30px 0px' }
+        { threshold: 0.08, rootMargin: '0px 0px -20px 0px' }
       );
 
       targets.forEach((el) => {
@@ -118,16 +122,16 @@ function ScrollWatcher() {
         }
         observer.observe(el);
       });
-
-      return observer;
     };
 
-    const obs = observeTargets();
-    const timeout = setTimeout(observeTargets, 250);
+    checkAndReveal();
+    const t1 = setTimeout(checkAndReveal, 150);
+    const t2 = setTimeout(checkAndReveal, 500);
 
     return () => {
-      clearTimeout(timeout);
-      if (obs) obs.disconnect();
+      clearTimeout(t1);
+      clearTimeout(t2);
+      if (observer) observer.disconnect();
     };
   }, [location]);
 
