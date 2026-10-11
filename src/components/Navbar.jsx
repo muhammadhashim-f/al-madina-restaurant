@@ -2,9 +2,10 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import { useFavorites } from "../context/FavoritesContext";
+import { useReservations } from "../context/ReservationsContext";
 import { useAuth } from "../context/AuthContext";
 import { useVIPLoader } from "../context/LoadingContext";
-import { Menu, X, ShoppingCart, User, ChevronDown, Search, Heart } from "lucide-react";
+import { Menu, X, ShoppingCart, User, ChevronDown, Search, Heart, CalendarCheck } from "lucide-react";
 
 // ============================================================
 // AL MADINA RESTAURANT — Navbar (v2: gradient + motion)
@@ -82,6 +83,7 @@ export default function Navbar() {
   const { user, isLoggedIn, signOut } = useAuth();
   const { cartCount } = useCart();
   const { favorites } = useFavorites();
+  const { reservations } = useReservations();
   const { triggerLoader } = useVIPLoader();
 
   const handleNavClick = (e, link) => {
@@ -411,6 +413,22 @@ export default function Navbar() {
                 )}
               </a>
 
+              {/* Table Booking & Orders History Icon */}
+              <a
+                href="/orders"
+                onClick={(e) => handleActionNav(e, "/orders", "📋 Bookings & Orders History", "Aapki table bookings aur live orders load ho rahe hain...", 1600)}
+                aria-label="View Table Bookings & Orders History"
+                title="Table Bookings & Orders History"
+                className="am-icon-btn relative p-2 rounded-full cursor-pointer"
+              >
+                <CalendarCheck size={19} className="am-white" />
+                {reservations && reservations.length > 0 && (
+                  <span className="am-cart-badge absolute -top-0.5 -right-0.5 bg-[#D4AF37] text-black text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                    {reservations.length}
+                  </span>
+                )}
+              </a>
+
               {/* Cart */}
               <a
                 id="am-navbar-cart-btn"
@@ -584,6 +602,19 @@ export default function Navbar() {
                   {favorites.length > 0 && (
                     <span className="am-cart-badge absolute -top-0.5 -right-0.5 bg-[#96283A] text-[#F5E9C8] text-[10px] font-semibold w-4 h-4 rounded-full flex items-center justify-center">
                       {favorites.length}
+                    </span>
+                  )}
+                </a>
+                <a
+                  href="/orders"
+                  onClick={(e) => handleActionNav(e, "/orders", "📋 Bookings & Orders History", "Aapki table bookings aur live orders load ho rahe hain...", 1600)}
+                  title="Table Bookings History"
+                  className="relative p-2 cursor-pointer"
+                >
+                  <CalendarCheck size={20} className="am-white" />
+                  {reservations && reservations.length > 0 && (
+                    <span className="am-cart-badge absolute -top-0.5 -right-0.5 bg-[#D4AF37] text-black text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                      {reservations.length}
                     </span>
                   )}
                 </a>

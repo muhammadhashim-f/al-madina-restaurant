@@ -195,10 +195,19 @@ export default function Reservations() {
       `}</style>
 
       <div className="am-res-card card-3d">
-        <div className="text-center mb-6">
-          <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest bg-[#D4AF37]/15 border border-[#D4AF37]/40 text-[#F0DFA0] mb-2 glow-3d">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mb-6 pb-4 border-b border-white/10">
+          <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest bg-[#D4AF37]/15 border border-[#D4AF37]/40 text-[#F0DFA0] glow-3d">
             🍽️ Shahi Dawat Booking — Table Mehfooz Farmayein
           </span>
+          <Link
+            to="/orders"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#D4AF37]/20 hover:bg-[#D4AF37]/35 border border-[#D4AF37]/50 text-[#F0DFA0] text-xs font-semibold transition-all hover:scale-105 cursor-pointer shadow-sm"
+            title="Apni tamam Table Bookings aur Orders ki history dekhein"
+          >
+            <CalendarCheck size={14} className="text-[#D4AF37]" /> Table Booking History Dekhein
+          </Link>
+        </div>
+        <div className="text-center mb-6">
           <h1 className="am-res-heading text-2xl sm:text-3xl font-bold">Reserve Your Royal Table</h1>
           <p className="text-sm text-white/60 mt-1">
             Hum aapke aur aapki family ke liye behtareen table mehfooz rakhenge

@@ -21,8 +21,10 @@ import {
   RotateCcw,
   Heart,
   Calendar,
+  Minus,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { MENU_ITEMS } from "./Menu";
 import { useCart } from "../context/CartContext";
 import { useOrders } from "../context/OrdersContext";
 import { useFavorites } from "../context/FavoritesContext";
@@ -205,6 +207,14 @@ const DISH_MAP = [
     image: "https://images.unsplash.com/photo-1544025162-d76694265947?q=80&w=600&auto=format&fit=crop",
     desc: "Saffron Biryani, 4x Seekh Kebabs, Malai Boti, Rogheni Naans & Raita.",
   },
+  {
+    keys: ["lime", "fresh lime", "fresh lime soda", "soda", "leemo"],
+    id: 8,
+    name: "Fresh Lime Soda",
+    price: 180,
+    image: "/Images/menu/Fresh Lime Soda.jpg",
+    desc: "Refreshing chilled sparkling soda with freshly squeezed desi lemon.",
+  },
 ];
 
 const DYNAMIC_FALLBACKS = [
@@ -223,33 +233,121 @@ const getRandomFallback = () => {
   return DYNAMIC_FALLBACKS[idx];
 };
 
+// Formats message text: Converts **bold** and *italic* cleanly into HTML without raw asterisks (*)
+function renderFormattedMessage(text) {
+  if (!text) return null;
+  const lines = text.split("\n");
+  return lines.map((line, lIdx) => {
+    // Process markdown inline: **bold** and *italic*
+    const parts = [];
+    let remainder = line;
+    let keyIdx = 0;
+
+    while (remainder.length > 0) {
+      const boldMatch = remainder.match(/\*\*(.*?)\*\*/);
+      const italicMatch = remainder.match(/(?<!\*)\*([^*]+)\*(?!\*)/);
+
+      let firstMatch = null;
+      let isBold = false;
+
+      if (boldMatch && italicMatch) {
+        if (boldMatch.index <= italicMatch.index) {
+          firstMatch = boldMatch;
+          isBold = true;
+        } else {
+          firstMatch = italicMatch;
+          isBold = false;
+        }
+      } else if (boldMatch) {
+        firstMatch = boldMatch;
+        isBold = true;
+      } else if (italicMatch) {
+        firstMatch = italicMatch;
+        isBold = false;
+      }
+
+      if (firstMatch) {
+        const prefix = remainder.slice(0, firstMatch.index);
+        if (prefix) {
+          parts.push(<span key={keyIdx++}>{prefix}</span>);
+        }
+        if (isBold) {
+          parts.push(
+            <strong key={keyIdx++} className="font-bold text-[#F5DEB3]">
+              {firstMatch[1]}
+            </strong>
+          );
+        } else {
+          parts.push(
+            <em key={keyIdx++} className="italic text-amber-200/90 font-medium">
+              {firstMatch[1]}
+            </em>
+          );
+        }
+        remainder = remainder.slice(firstMatch.index + firstMatch[0].length);
+      } else {
+        parts.push(<span key={keyIdx++}>{remainder}</span>);
+        break;
+      }
+    }
+
+    return (
+      <React.Fragment key={lIdx}>
+        {parts}
+        {lIdx < lines.length - 1 && <br />}
+      </React.Fragment>
+    );
+  });
+}
+
 function InlineOrderForm({ initialItems, defaultTotal, onConfirm, defaultCustomerName }) {
+  const [items, setItems] = useState(() => {
+    if (initialItems && initialItems.length > 0) {
+      return initialItems.map((it) => ({
+        id: it.id,
+        name: it.name,
+        price: it.price || 0,
+        quantity: Math.max(1, Number(it.quantity) || 1),
+        image: it.image || "",
+      }));
+    }
+    return [{ id: 4, name: "Chicken Biryani", price: 850, quantity: 1, image: "/Images/menu/Chicken Biryani.jpg" }];
+  });
+
   const [name, setName] = useState(defaultCustomerName || "");
   const [phone, setPhone] = useState("0300-1234567");
   const [address, setAddress] = useState("Sector 36-B, Korangi, Karachi");
   const [payment, setPayment] = useState("cod");
   const [isDone, setIsDone] = useState(false);
 
-  const subtotal =
-    initialItems && initialItems.length > 0
-      ? initialItems.reduce((s, it) => s + (it.price || 0) * (it.quantity || 1), 0)
-      : (defaultTotal ? defaultTotal - 150 : 1450);
   const delivery = 150;
+  const subtotal = items.reduce((s, it) => s + (it.price || 0) * (it.quantity || 1), 0);
   const grandTotal = subtotal + delivery;
+
+  const handleUpdateQty = (itemId, delta) => {
+    setItems((prev) =>
+      prev
+        .map((it) => {
+          if (it.id === itemId) {
+            const nextQty = it.quantity + delta;
+            return nextQty > 0 ? { ...it, quantity: nextQty } : null;
+          }
+          return it;
+        })
+        .filter(Boolean)
+    );
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!name.trim() || !phone.trim() || !address.trim()) return;
+    if (!name.trim() || !phone.trim() || !address.trim() || items.length === 0) return;
     setIsDone(true);
     onConfirm({
       name: name.trim(),
       phone: phone.trim(),
       address: address.trim(),
       payment,
-      items:
-        initialItems && initialItems.length > 0
-          ? initialItems
-          : [{ id: 4, name: "Chicken Biryani Special", price: 850, quantity: 1 }],
+      items,
       total: grandTotal,
     });
   };
@@ -261,39 +359,86 @@ function InlineOrderForm({ initialItems, defaultTotal, onConfirm, defaultCustome
           <CheckCircle2 size={14} /> Order Information Submit Ho Chuki Hai!
         </div>
         <p className="text-[11px] text-emerald-300/80 mt-1">
-          Aapka order kitchen queue mein darj ho gaya hai (Pending Owner Approval).
+          Aapka parcel order kitchen queue mein darj ho gaya hai (Pending Owner Approval).
         </p>
       </div>
     );
   }
 
   return (
-    <div className="mt-3 p-3 bg-gradient-to-b from-[#18150E] to-[#0E0C08] border border-[#D4AF37]/50 rounded-xl space-y-2.5">
+    <div className="mt-3 p-3.5 bg-gradient-to-b from-[#18150E] to-[#0E0C08] border border-[#D4AF37]/50 rounded-xl space-y-3 shadow-xl">
       <div className="flex items-center justify-between border-b border-white/10 pb-2">
         <span className="text-xs font-bold text-[#F0DFA0] flex items-center gap-1.5">
-          <Receipt size={14} className="text-[#D4AF37]" /> 📦 Order Information Form
+          <Receipt size={14} className="text-[#D4AF37]" /> 📦 Parcel Order Information Form
         </span>
-        <span className="text-[10px] text-amber-400 font-semibold">Karachi Delivery</span>
+        <span className="text-[10px] px-2 py-0.5 bg-[#D4AF37]/15 text-amber-300 font-semibold rounded-full border border-[#D4AF37]/30">
+          Karachi Delivery
+        </span>
       </div>
 
-      {initialItems && initialItems.length > 0 && (
-        <div className="space-y-1 bg-black/40 p-2 rounded-lg border border-white/5 text-[11px]">
-          {initialItems.map((it, idx) => (
-            <div key={idx} className="flex justify-between text-white/80">
-              <span>{it.quantity || 1}x {it.name}</span>
-              <span className="text-amber-300 font-medium">Rs {(it.price || 0) * (it.quantity || 1)}</span>
+      {/* Items List with Rates and Plus / Minus Quantity Buttons */}
+      <div className="space-y-2 bg-black/50 p-2.5 rounded-lg border border-white/10 text-xs">
+        <div className="text-[10px] uppercase font-bold text-white/50 tracking-wider flex justify-between pb-1 border-b border-white/5">
+          <span>Item & Rates</span>
+          <span>Miqdaar (+ / -) & Total</span>
+        </div>
+
+        {items.length === 0 ? (
+          <p className="text-red-400 text-center py-2 text-[11px]">Koi item select nahi hai.</p>
+        ) : (
+          items.map((it) => (
+            <div key={it.id} className="flex items-center justify-between gap-2 py-1 border-b border-white/5 last:border-b-0">
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-white truncate text-[11.5px]">{it.name}</p>
+                <p className="text-[10.5px] text-white/55">Rate: Rs {it.price}</p>
+              </div>
+
+              {/* Plus / Minus Qty Controls */}
+              <div className="flex items-center gap-1.5 bg-white/5 px-2 py-1 rounded-md border border-white/10">
+                <button
+                  type="button"
+                  onClick={() => handleUpdateQty(it.id, -1)}
+                  className="w-5 h-5 rounded bg-white/10 hover:bg-white/20 text-white flex items-center justify-center font-bold text-xs cursor-pointer active:scale-95 transition-all"
+                  title="Minus item"
+                >
+                  <Minus size={11} />
+                </button>
+                <span className="w-5 text-center font-bold text-[#F0DFA0] text-xs">
+                  {it.quantity}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleUpdateQty(it.id, 1)}
+                  className="w-5 h-5 rounded bg-[#D4AF37]/30 hover:bg-[#D4AF37]/50 text-[#FFF2A3] flex items-center justify-center font-bold text-xs cursor-pointer active:scale-95 transition-all"
+                  title="Plus item"
+                >
+                  <Plus size={11} />
+                </button>
+              </div>
+
+              <div className="w-16 text-right font-bold text-amber-300 text-[11.5px]">
+                Rs {it.price * it.quantity}
+              </div>
             </div>
-          ))}
-          <div className="flex justify-between text-white/50 pt-1 border-t border-white/10">
-            <span>Delivery Fee</span>
+          ))
+        )}
+
+        {/* Pricing Summary */}
+        <div className="pt-2 border-t border-white/10 space-y-1 text-[11px]">
+          <div className="flex justify-between text-white/60">
+            <span>Items Subtotal</span>
+            <span>Rs {subtotal}</span>
+          </div>
+          <div className="flex justify-between text-white/60">
+            <span>Delivery Charges (All Karachi)</span>
             <span>Rs {delivery}</span>
           </div>
-          <div className="flex justify-between text-[#D4AF37] font-bold pt-1 border-t border-[#D4AF37]/30">
+          <div className="flex justify-between text-[#D4AF37] font-bold text-xs pt-1 border-t border-[#D4AF37]/30">
             <span>Kul Total Raqam</span>
-            <span>Rs {grandTotal}</span>
+            <span className="text-sm">Rs {grandTotal}</span>
           </div>
         </div>
-      )}
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-2">
         <div>
@@ -343,9 +488,10 @@ function InlineOrderForm({ initialItems, defaultTotal, onConfirm, defaultCustome
 
         <button
           type="submit"
-          className="w-full py-2 mt-1 rounded-lg bg-gradient-to-r from-[#D4AF37] to-[#F5DEB3] text-black font-bold text-xs hover:brightness-110 transition-all cursor-pointer shadow-[0_0_12px_rgba(212,175,55,0.3)] flex items-center justify-center gap-1.5"
+          disabled={items.length === 0}
+          className="w-full py-2.5 mt-1 rounded-lg bg-gradient-to-r from-[#D4AF37] to-[#F5DEB3] text-black font-bold text-xs hover:brightness-110 transition-all cursor-pointer shadow-[0_0_12px_rgba(212,175,55,0.3)] flex items-center justify-center gap-1.5 disabled:opacity-50"
         >
-          <Check size={13} /> Confirm & Place Order Now
+          <Check size={13} /> Confirm & Place Parcel Order Now
         </button>
       </form>
     </div>
@@ -954,37 +1100,31 @@ export default function Chatbot() {
 
   const findDishesForContext = (cleanText, context) => {
     const result = [];
+
+    // Identify which segment applies to which context
+    // Pattern: context keywords often govern everything until the next action keyword
+    const actionKeywords = [
+      { name: "favorite", regex: /\b(favorite|favourite|fav|pasand)\b/i },
+      { name: "cart", regex: /\b(cart|tokri|add|dalo)\b/i },
+      { name: "order", regex: /\b(order|mangwa|bhej|mangwana)\b/i },
+      { name: "table", regex: /\b(table|tabel|seat|reserve|reservation)\b/i },
+    ];
+
+    // Split text into clauses by connectors
     const clauses = cleanText.split(/\s*(?:aur|and|,|\.|\n|phir|pir)\s*/i);
 
+    let currentContext = null;
+
     clauses.forEach((clause) => {
-      let matchesContext = false;
-      if (
-        context === "favorite" &&
-        (clause.includes("favorite") ||
-          clause.includes("favourite") ||
-          clause.includes("fav") ||
-          clause.includes("pasand"))
-      ) {
-        matchesContext = true;
-      } else if (
-        context === "cart" &&
-        (clause.includes("cart") ||
-          clause.includes("tokri") ||
-          clause.includes("dalo") ||
-          clause.includes("add"))
-      ) {
-        matchesContext = true;
-      } else if (
-        context === "order" &&
-        (clause.includes("order") ||
-          clause.includes("mangwa") ||
-          clause.includes("bhej") ||
-          clause.includes("chahiye"))
-      ) {
-        matchesContext = true;
+      // Check if this clause introduces a new context
+      for (const ak of actionKeywords) {
+        if (ak.regex.test(clause)) {
+          currentContext = ak.name;
+          break;
+        }
       }
 
-      if (matchesContext) {
+      if (currentContext === context) {
         DISH_MAP.forEach((item) => {
           const hasDish = item.keys.some((k) => clause.includes(k));
           if (hasDish && !result.some((r) => r.product.id === item.id)) {
@@ -998,24 +1138,31 @@ export default function Chatbot() {
       }
     });
 
+    // If context was order and no specific items matched inside clauses, check whole string if order is requested
+    if (result.length === 0 && context === "order" && (cleanText.includes("order") || cleanText.includes("mangwa"))) {
+      DISH_MAP.forEach((item) => {
+        const hasDish = item.keys.some((k) => cleanText.includes(k));
+        if (hasDish && !result.some((r) => r.product.id === item.id)) {
+          const keyUsed = item.keys.find((k) => cleanText.includes(k));
+          const idx = cleanText.indexOf(keyUsed);
+          const wordsBefore = cleanText.slice(Math.max(0, idx - 25), idx);
+          const qty = parseQuantity(wordsBefore);
+          result.push({ product: item, quantity: qty });
+        }
+      });
+    }
+
+    // Default fallbacks if still empty
     if (result.length === 0) {
       if (context === "favorite" && (cleanText.includes("favorite") || cleanText.includes("fav"))) {
         if (cleanText.includes("samosa")) result.push({ product: MENU_RECOMMENDATIONS.samosa, quantity: 1 });
         if (cleanText.includes("biryani")) result.push({ product: MENU_RECOMMENDATIONS.biryani, quantity: 1 });
         if (cleanText.includes("karahi") || cleanText.includes("mutton")) result.push({ product: MENU_RECOMMENDATIONS.karahi, quantity: 1 });
       } else if (context === "cart" && cleanText.includes("cart")) {
+        if (cleanText.includes("karahi") || cleanText.includes("mutton")) result.push({ product: MENU_RECOMMENDATIONS.karahi, quantity: 1 });
         if (cleanText.includes("samosa")) result.push({ product: MENU_RECOMMENDATIONS.samosa, quantity: 1 });
         if (cleanText.includes("biryani")) result.push({ product: MENU_RECOMMENDATIONS.biryani, quantity: 1 });
         if (cleanText.includes("gulab") || cleanText.includes("meetha")) result.push({ product: MENU_RECOMMENDATIONS.dessert, quantity: 1 });
-        if (cleanText.includes("karahi") || cleanText.includes("mutton")) result.push({ product: MENU_RECOMMENDATIONS.karahi, quantity: 1 });
-      } else if (context === "order" && cleanText.includes("order")) {
-        if (cleanText.includes("samosa")) {
-          const q = cleanText.includes("panch samosa") || cleanText.includes("5 samosa") ? 5 : 1;
-          result.push({ product: MENU_RECOMMENDATIONS.samosa, quantity: q });
-        }
-        if (cleanText.includes("chai") || cleanText.includes("kashmiri") || cleanText.includes("kadhmiri")) {
-          result.push({ product: MENU_RECOMMENDATIONS.chai, quantity: 1 });
-        }
       }
     }
 
@@ -1861,6 +2008,130 @@ export default function Chatbot() {
         };
       }
 
+      // ========================================================
+      // 10-B. WEBSITE MENU STATS: "Website par kitne items hain?"
+      // ========================================================
+      const isItemCountQuery =
+        (clean.includes("kitne item") ||
+          clean.includes("kitni dishes") ||
+          clean.includes("kitne product") ||
+          clean.includes("total item") ||
+          clean.includes("total dish") ||
+          clean.includes("total dishes")) &&
+        (clean.includes("website") || clean.includes("menu") || clean.includes("paas") || clean.includes("hain"));
+
+      if (isItemCountQuery) {
+        const totalItemsCount = MENU_ITEMS.length;
+        const categories = ["👑 VIP Selection", "Starters", "Mains", "Desserts", "Drinks"];
+        const categoryBreakdown = categories
+          .map((cat) => {
+            const count = MENU_ITEMS.filter((it) => it.category === cat).length;
+            return `• **${cat}:** ${count} Items`;
+          })
+          .join("\n");
+
+        return {
+          text: `Bhai jaan, hamari Al Madina Restaurant ki website par kul **${totalItemsCount} Special Shahi Dishes** dastyab hain! 🍽️✨\n\n📋 **Category-wise Tafseelat:**\n${categoryBreakdown}\n\nTamam dishes zabiha halaal, taaza desi masalon aur royal recipe ke sath tayyar ki jati hain. Kiya aap tamam items ki prices dekhna chahte hain?`,
+          product: MENU_ITEMS[0],
+          suggestedQuestions: [
+            "Sabhi items ki prices show karo",
+            "Kon kon se products offer me hain?",
+            "Chicken Biryani order karein",
+            "Menu section dekhein",
+          ],
+        };
+      }
+
+      // ========================================================
+      // 10-C. ALL DISHES & RATES: "Sabhi items ki prices show kro"
+      // ========================================================
+      const isAllPricesQuery =
+        (clean.includes("sab") || clean.includes("sabhi") || clean.includes("tamam") || clean.includes("all")) &&
+        (clean.includes("price") || clean.includes("rate") || clean.includes("rates") || clean.includes("keemat") || clean.includes("daam") || clean.includes("list")) &&
+        !clean.includes("order");
+
+      if (isAllPricesQuery) {
+        const fullRateList = MENU_ITEMS.map((it) => {
+          const discountInfo = it.discount > 0 ? ` (${it.discount}% OFF Offer)` : "";
+          return `• **${it.name}:** Rs ${it.price}${discountInfo} [${it.category}]`;
+        }).join("\n");
+
+        return {
+          text: `Yeh lijiye Bhai jaan! Al Madina Restaurant Karachi ki tamam dishes ki mukammal Rate List hazir hai: 📜✨\n\n${fullRateList}\n\n🛵 **Delivery Charge:** All Karachi sirf Rs 150\n💡 Aap kisi bhi dish ka naam bol kar foran Cart mein add karwa sakte hain ya direct parcel order place kar sakte hain!`,
+          product: MENU_ITEMS[1],
+          suggestedQuestions: [
+            "Kon kon se products offer me hain?",
+            "10 samosa aur 1 biryani order karo",
+            "Table book karein",
+            "Cart dikhayein",
+          ],
+        };
+      }
+
+      // ========================================================
+      // 10-D. OFFERS & DEALS: "Kon kon se products offer me chal rahe hain aur kitne offer me hain?"
+      // ========================================================
+      const isOfferQuery =
+        clean.includes("offer") ||
+        clean.includes("discount") ||
+        clean.includes("deal") ||
+        clean.includes("bachat") ||
+        clean.includes("choot") ||
+        clean.includes("sasti");
+
+      if (isOfferQuery) {
+        const discountedItems = MENU_ITEMS.filter((it) => it.discount > 0);
+        const offerList = discountedItems
+          .map((it) => {
+            const originalPrice = Math.round(it.price / (1 - it.discount / 100));
+            return `• **${it.name}:** Rs ${it.price} (Original: Rs ${originalPrice} — **${it.discount}% FLAT OFF**)`;
+          })
+          .join("\n");
+
+        return {
+          text: `Al Madina Restaurant par is waqt kul **${discountedItems.length} VIP Products Special Discount Offer** par chal rahe hain! 🎉🔥\n\n🎁 **Running Offers & Discounts:**\n${offerList}\n\n👑 **Special Deal Notice:** Yeh deals limited time period ke liye dastiyab hain. Aap in mein se koi bhi deal foran cart mein add ya order kar sakte hain!`,
+          product: discountedItems[0],
+          suggestedQuestions: [
+            "VIP Shahi Dawat Platter cart mein dalo",
+            "Sabhi items ki prices show karo",
+            "Table book karein",
+            "Ek acha sa review likh do",
+          ],
+        };
+      }
+
+      // ========================================================
+      // 10-E. DIRECT WRITE REVIEW REQUEST: "Bhai ek review likh do"
+      // ========================================================
+      const isWriteReviewRequest =
+        clean.includes("review likh do") ||
+        clean.includes("review likh de") ||
+        clean.includes("review likho") ||
+        clean.includes("ek review do") ||
+        clean.includes("review bana do") ||
+        clean.includes("review tayyar karo");
+
+      if (isWriteReviewRequest) {
+        const reviewText =
+          "Al Madina Restaurant Karachi ka khana nihayat lazeez, khushbudar aur taaza hai! Chicken Biryani dum pukht tareeqay se pakki hui hai, Mutton Karahi mitti ki handi mein desi ghee ke sath lajawab hai aur staff boht cooperative hai. 5 Stars VIP Service! ⭐⭐⭐⭐⭐";
+        addReview({
+          name: customerName,
+          rating: 5,
+          comment: reviewText,
+          status: "pending",
+        });
+
+        return {
+          text: `🌟 **Al Madina Review darj kar diya gaya hai:**\n\n"${reviewText}"\n\n👤 **Reviewer:** ${customerName}\n⭐ **Rating:** 5/5 Stars\n⏳ **Status: Submitted (Pending Admin Approval)**\n\n(Aapka review website database mein darj ho gaya hai. Jaise hi Admin panel se OK kiya jayega, yeh tamam customers ko live Customer Reviews section mein show hona shuru ho jayega!)`,
+          reviewPrompt: true,
+          suggestedQuestions: [
+            "Reviews section dekhein",
+            "Dishes order karein",
+            "Table reserve karein",
+          ],
+        };
+      }
+
       // Check for Gemini API or rich culinary fallback
       const geminiReply = await callServerGemini(raw);
       if (geminiReply) {
@@ -2695,7 +2966,7 @@ export default function Chatbot() {
           <div className="am-chat-body" ref={scrollRef}>
             {messages.map((m) => (
               <div key={m.id} className={`am-bubble ${m.from}`}>
-                <p>{m.text}</p>
+                <div className="leading-relaxed">{renderFormattedMessage(m.text)}</div>
 
                 {/* Bill Breakdown Card */}
                 {m.bill && (
@@ -2855,7 +3126,7 @@ export default function Chatbot() {
             {/* Pen-style Typewriter streaming in progress */}
             {typewriterText && (
               <div className="am-bubble bot">
-                <p>{typewriterText}</p>
+                <div className="leading-relaxed inline">{renderFormattedMessage(typewriterText)}</div>
                 <span className="inline-block w-1.5 h-3.5 bg-[#D4AF37] ml-0.5 animate-pulse" />
               </div>
             )}
