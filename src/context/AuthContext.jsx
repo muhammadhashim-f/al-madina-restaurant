@@ -74,7 +74,7 @@ export function AuthProvider({ children }) {
     }
 
     // Direct Google authentication: creates verified Google session
-    const email = googleUser?.email || "ah1572986@gmail.com";
+    const email = googleUser?.email?.trim() || "guest.user@gmail.com";
     const name = googleUser?.name || (email.split("@")[0].charAt(0).toUpperCase() + email.split("@")[0].slice(1));
     const user = {
       id: `usr_g_${Date.now()}`,
@@ -87,11 +87,18 @@ export function AuthProvider({ children }) {
       created_at: new Date().toISOString(),
     };
     const newSession = {
-      access_token: `mock_google_token_${Date.now()}`,
+      access_token: `google_token_${Date.now()}`,
       user,
     };
     try {
       localStorage.setItem("am_mock_auth_session", JSON.stringify(newSession));
+      // Save this account to the device's list of saved accounts
+      const existingStr = localStorage.getItem("am_saved_google_accounts");
+      const existing = existingStr ? JSON.parse(existingStr) : [];
+      if (!existing.some((acc) => acc.email.toLowerCase() === email.toLowerCase())) {
+        existing.push({ email, name, avatar: googleUser?.avatar || null, lastUsed: Date.now() });
+        localStorage.setItem("am_saved_google_accounts", JSON.stringify(existing));
+      }
     } catch {}
     setSession(newSession);
     return { data: { user, session: newSession }, error: null };

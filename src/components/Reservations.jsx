@@ -1,14 +1,17 @@
 import React, { useState } from "react";
-import { Calendar, Clock, Users, MessageSquare, CalendarCheck } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Calendar, Clock, Users, MessageSquare, CalendarCheck, Clock3, ArrowRight } from "lucide-react";
+import { useReservations } from "../context/ReservationsContext";
+import { RESTAURANT_PHONE } from "../utils/whatsapp";
 
 // ============================================================
 // AL MADINA RESTAURANT — Reservations Page
-// Matches theme: black background, gold accents, white text.
-// Form is UI-only for now — will write to a Supabase
-// "reservations" table once the backend is connected.
+// Connected with ReservationsContext & Supabase "reservations" table.
+// Default status is 'pending' until approved by restaurant owner.
 // ============================================================
 
 export default function Reservations() {
+  const { addReservation } = useReservations();
   const [form, setForm] = useState({
     name: "",
     phone: "",
@@ -17,44 +20,91 @@ export default function Reservations() {
     guests: 2,
     notes: "",
   });
-  const [confirmed, setConfirmed] = useState(false);
+  const [confirmedBooking, setConfirmedBooking] = useState(null);
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!form.name || !form.phone || !form.date || !form.time) return;
-    setConfirmed(true);
+
+    const saved = addReservation({
+      name: form.name.trim(),
+      phone: form.phone.trim(),
+      date: form.date,
+      time: form.time,
+      guests: Number(form.guests || 2),
+      notes: form.notes.trim(),
+      status: "pending",
+    });
+
+    setConfirmedBooking(saved);
   };
 
-  if (confirmed) {
+  if (confirmedBooking) {
+    const waText = encodeURIComponent(
+      `Assalam o Alaikum! Mene Al Madina Restaurant mein Table Booking karwai hai:\nBooking ID: ${confirmedBooking.id}\nNaam: ${confirmedBooking.name}\nDate: ${confirmedBooking.date}\nWaqt: ${confirmedBooking.time}\nMehmaan: ${confirmedBooking.guests} afraad\nStatus: Pending Approval\nMeherbani farma kar table confirm farma dein.`
+    );
+    const waUrl = `https://wa.me/92${RESTAURANT_PHONE.replace(/^0/, "").replace(/\D/g, "")}?text=${waText}`;
+
     return (
       <section
         id="reservations"
-        className="w-full min-h-screen flex items-center justify-center px-4"
+        className="w-full min-h-screen flex items-center justify-center px-4 py-16"
         style={{ background: "linear-gradient(160deg, #0A0A0A 0%, #141414 60%, #0A0A0A 100%)" }}
       >
-        <div className="text-center max-w-md">
+        <div className="text-center max-w-lg bg-[#14120E] border border-[#D4AF37]/35 rounded-2xl p-8 shadow-2xl animate-fade-in">
           <div
-            className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6"
-            style={{ background: "rgba(212,175,55,0.12)", border: "1px solid rgba(212,175,55,0.4)" }}
+            className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
+            style={{ background: "rgba(212,175,55,0.15)", border: "1px solid rgba(212,175,55,0.5)" }}
           >
-            <CalendarCheck size={26} style={{ color: "#D4AF37" }} />
+            <Clock3 size={30} className="text-[#D4AF37] animate-pulse" />
           </div>
-          <h2 className="text-2xl font-bold text-white mb-3" style={{ fontFamily: "'Amiri', serif" }}>
-            Table reserved
+
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-semibold border border-amber-500/40 mb-3">
+            <span className="w-2 h-2 rounded-full bg-amber-400 inline-block animate-ping" />
+            Booking Status: ⏳ Pending Owner Approval
+          </div>
+
+          <h2 className="text-2xl font-bold text-white mb-2" style={{ fontFamily: "'Amiri', serif" }}>
+            Table Booking Request Received!
           </h2>
-          <p className="text-sm mb-6" style={{ color: "rgba(255,255,255,0.65)" }}>
-            {form.name}, your table for {form.guests} on {form.date} at {form.time} is booked.
-            A confirmation will be sent to your phone shortly.
+
+          <p className="text-xs text-white/75 mb-5 leading-relaxed">
+            Shukriya <strong>{confirmedBooking.name}</strong>! Aapki table booking ({confirmedBooking.guests} afraad, {confirmedBooking.date} ko {confirmedBooking.time} baje) Al Madina Restaurant ke database mein receive ho gayi hai.
+            <br /><br />
+            <span className="text-[#F0DFA0] bg-white/5 p-2 rounded-lg block border border-white/10">
+              Note: Pehle yeh booking <strong>Pending</strong> rahegi. Jaise hi restaurant owner check kar ke <strong>OK</strong> karenge, yeh status <strong>Confirmed</strong> ho jayega. Aap Order History mein apni tamam booking details live dekh sakte hain.
+            </span>
           </p>
+
+          <div className="flex flex-col sm:flex-row gap-2.5 justify-center">
+            <Link
+              to="/orders"
+              className="inline-flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#F0DFA0] text-black text-xs font-bold shadow-lg hover:brightness-110 transition-all"
+            >
+              <CalendarCheck size={14} /> Booking History Dekhein <ArrowRight size={13} />
+            </Link>
+
+            <a
+              href={waUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#25D366] text-black text-xs font-bold hover:bg-[#1EBE5D] transition-all"
+            >
+              <MessageSquare size={14} /> Owner WhatsApp Rabta
+            </a>
+          </div>
+
           <button
-            onClick={() => { setConfirmed(false); setForm({ name: "", phone: "", date: "", time: "", guests: 2, notes: "" }); }}
-            className="am-res-btn px-6 py-2.5 rounded-md text-sm font-semibold"
+            onClick={() => {
+              setConfirmedBooking(null);
+              setForm({ name: "", phone: "", date: "", time: "", guests: 2, notes: "" });
+            }}
+            className="mt-6 text-xs text-white/50 hover:text-white underline cursor-pointer"
           >
-            Make another reservation
+            Nayi Table Book Karein
           </button>
-          <style>{`.am-res-btn { background: linear-gradient(135deg, #D4AF37, #F0DFA0); color: #0A0A0A; }`}</style>
         </div>
       </section>
     );

@@ -111,11 +111,12 @@ export default function Reviews() {
       return;
     }
 
-    // Approved verified review
-    const verifiedReview = {
+    // Submit as pending approval (admin must OK before it becomes public to other customers)
+    const submittedReview = {
       name: form.name.trim(),
       rating: form.rating,
       comment: form.comment.trim(),
+      status: "pending",
       verified: true,
       verifiedDate: new Date().toLocaleDateString("en-US", {
         month: "short",
@@ -124,14 +125,14 @@ export default function Reviews() {
       }),
     };
 
-    addReview(verifiedReview);
-    setSpotlightReview(verifiedReview);
+    addReview(submittedReview);
+    setSpotlightReview(submittedReview);
     setSuccessToast(
-      "Shukriya! Aapka review kamyabi se verify ho kar website ke top par publish ho gaya hai!"
+      "Shukriya! Aapka review submit ho chuka hai. Aapko yeh show ho raha hai, lekin sabhi public customers ko yeh Admin ki tasdeeq (OK) ke baad nazar aayega."
     );
     setForm({ name: user?.user_metadata?.full_name || "", rating: 5, comment: "" });
 
-    setTimeout(() => setSuccessToast(""), 8000);
+    setTimeout(() => setSuccessToast(""), 9000);
   };
 
   return (
@@ -241,11 +242,15 @@ export default function Reviews() {
                 </div>
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
-                      ✨ Top Spotlight: Verified Safe Customer Review
+                    <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">
+                      {spotlightReview.status === "pending"
+                        ? "⏳ Aapka Review (Admin Tasdeeq Ka Intezar)"
+                        : "✨ Verified Customer Review"}
                     </span>
-                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-semibold border border-emerald-500/30">
-                      ✓ Live Spotlight On Top
+                    <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full font-semibold border border-amber-500/30">
+                      {spotlightReview.status === "pending"
+                        ? "Pending Approval · Owner OK karein ge to sab dekhenge"
+                        : "✓ Live on Website"}
                     </span>
                   </div>
                   <p className="text-sm text-white font-medium mt-1">
@@ -256,14 +261,14 @@ export default function Reviews() {
                     <span>·</span>
                     <span className="text-amber-400">{spotlightReview.rating} ★★★★★</span>
                     <span>·</span>
-                    <span>Just Verified & Approved</span>
+                    <span>{spotlightReview.status === "pending" ? "Awaiting Admin OK" : "Approved"}</span>
                   </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setSpotlightReview(null)}
-                className="text-xs text-white/40 hover:text-white px-2 py-1 self-start sm:self-center"
+                className="text-xs text-white/40 hover:text-white px-2 py-1 self-start sm:self-center cursor-pointer"
               >
                 ✕ Close
               </button>
@@ -272,9 +277,11 @@ export default function Reviews() {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Reviews list */}
+          {/* Reviews list (Only approved reviews are shown publicly to everyone!) */}
           <div className="lg:col-span-2 space-y-4 max-h-[480px] overflow-y-auto pr-1 reveal-left">
-            {reviews.map((r) => (
+            {reviews
+              .filter((r) => r.status === "approved" || !r.status || r.id === spotlightReview?.id)
+              .map((r) => (
               <div key={r.id} className="am-rev-card card-3d">
                 <div className="flex items-start gap-3">
                   <div className="am-avatar-circle">
@@ -284,9 +291,15 @@ export default function Reviews() {
                     <div className="flex items-center justify-between flex-wrap gap-1 mb-1">
                       <div className="flex items-center gap-2">
                         <p className="text-white text-sm font-bold">{r.name}</p>
-                        <span className="inline-flex items-center gap-1 text-[10px] bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-semibold px-2 py-0.5 rounded-full">
-                          <ShieldCheck size={11} /> Verified Customer
-                        </span>
+                        {r.status === "pending" ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] bg-amber-500/15 border border-amber-500/30 text-amber-400 font-semibold px-2 py-0.5 rounded-full">
+                            ⏳ Admin Approval Pending (Sirf aapko preview mein dikh raha hai)
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-semibold px-2 py-0.5 rounded-full">
+                            <ShieldCheck size={11} /> Verified Customer
+                          </span>
+                        )}
                       </div>
                       <span className="text-xs text-white/45">
                         {r.date || r.verifiedDate || "Recent"}

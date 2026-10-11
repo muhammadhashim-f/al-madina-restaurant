@@ -40,6 +40,7 @@ import {
 } from "lucide-react";
 import { useOrders } from "../context/OrdersContext";
 import { useReviews } from "../context/ReviewsContext";
+import { useReservations } from "../context/ReservationsContext";
 import { useCart } from "../context/CartContext";
 import { useFavorites } from "../context/FavoritesContext";
 import {
@@ -80,11 +81,12 @@ const DEFAULT_SETTINGS = {
 
 export default function AdminDashboard() {
   const { orders, updateOrderStatus, deleteOrder } = useOrders();
-  const { reviews, addReview, updateReview, deleteReview, averageRating } = useReviews();
+  const { reviews, addReview, approveReview, updateReview, deleteReview, averageRating } = useReviews();
+  const { reservations, updateReservationStatus, deleteReservation } = useReservations();
   const { items: globalCartItems } = useCart();
   const { favorites: globalFavorites } = useFavorites();
 
-  const [activeTab, setActiveTab] = useState("orders"); // "orders" | "chats" | "reviews" | "customers" | "settings"
+  const [activeTab, setActiveTab] = useState("orders"); // "orders" | "chats" | "reviews" | "reservations" | "customers" | "settings"
   const [rawChats, setRawChats] = useState([]);
   const [chatsLoading, setChatsLoading] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState(null);
@@ -95,11 +97,15 @@ export default function AdminDashboard() {
   const [expandedCardId, setExpandedCardId] = useState(null);
   const [copiedMsgId, setCopiedMsgId] = useState(null);
 
-  // Review Edit & Add State
+  // Review Moderation State
+  const [reviewFilter, setReviewFilter] = useState("all"); // "all" | "pending" | "approved"
   const [editingReview, setEditingReview] = useState(null);
   const [reviewForm, setReviewForm] = useState({ name: "", rating: 5, comment: "" });
   const [showAddReviewModal, setShowAddReviewModal] = useState(false);
   const [reviewSearch, setReviewSearch] = useState("");
+
+  // Reservation Filter State
+  const [reservationFilter, setReservationFilter] = useState("all"); // "all" | "pending" | "confirmed"
 
   // Customer Activity Search
   const [customerSearch, setCustomerSearch] = useState("");
@@ -382,7 +388,20 @@ export default function AdminDashboard() {
 
   const filteredReviews = reviews.filter((r) => {
     const q = reviewSearch.toLowerCase();
-    return r.name.toLowerCase().includes(q) || r.comment.toLowerCase().includes(q);
+    const matchesSearch = r.name.toLowerCase().includes(q) || r.comment.toLowerCase().includes(q);
+    if (!matchesSearch) return false;
+    if (reviewFilter === "pending") return r.status === "pending";
+    if (reviewFilter === "approved") return r.status === "approved" || !r.status;
+    return true;
+  });
+
+  const pendingReviewsCount = reviews.filter((r) => r.status === "pending").length;
+  const approvedReviewsCount = reviews.filter((r) => r.status === "approved" || !r.status).length;
+
+  const filteredReservations = reservations.filter((res) => {
+    if (reservationFilter === "pending") return res.status === "pending";
+    if (reservationFilter === "confirmed") return res.status === "confirmed";
+    return true;
   });
 
   // Review Actions
@@ -518,6 +537,27 @@ export default function AdminDashboard() {
           >
             <Star size={15} />
             Customer Reviews ({reviews.length})
+            {pendingReviewsCount > 0 && (
+              <span className="bg-amber-500 text-black text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                {pendingReviewsCount} new
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab("reservations")}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+              activeTab === "reservations"
+                ? "bg-[#D4AF37] text-black shadow-lg shadow-[#D4AF37]/20"
+                : "text-white/70 hover:text-white bg-white/5 hover:bg-white/10"
+            }`}
+          >
+            <CalendarCheck size={15} />
+            Table Reservations ({reservations.length})
+            {reservations.filter((r) => r.status === "pending").length > 0 && (
+              <span className="bg-amber-500 text-black text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                {reservations.filter((r) => r.status === "pending").length} new
+              </span>
+            )}
           </button>
           <button
             onClick={() => setActiveTab("customers")}
@@ -1170,9 +1210,9 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Search */}
-            <div className="mb-4">
-              <div className="relative">
+            {/* Search & Filter */}
+            <div className="mb-5 flex flex-col sm:flex-row gap-3 items-center justify-between">
+              <div className="relative flex-1 w-full">
                 <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/40" />
                 <input
                   type="text"
@@ -1181,6 +1221,45 @@ export default function AdminDashboard() {
                   placeholder="Search reviews by customer name or comments..."
                   className="w-full bg-black/40 border border-white/10 focus:border-[#D4AF37] rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-white/40 focus:outline-none"
                 />
+              </div>
+
+              {/* Review Filter Pills */}
+              <div className="flex items-center gap-1.5 shrink-0 self-start sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => setReviewFilter("all")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    reviewFilter === "all"
+                      ? "bg-[#D4AF37] text-black"
+                      : "bg-white/5 text-white/70 hover:text-white"
+                  }`}
+                >
+                  All ({reviews.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReviewFilter("pending")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                    reviewFilter === "pending"
+                      ? "bg-amber-500 text-black font-bold"
+                      : pendingReviewsCount > 0
+                      ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                      : "bg-white/5 text-white/70 hover:text-white"
+                  }`}
+                >
+                  Pending Approval ⏳ ({pendingReviewsCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReviewFilter("approved")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    reviewFilter === "approved"
+                      ? "bg-emerald-500 text-black font-bold"
+                      : "bg-white/5 text-white/70 hover:text-white"
+                  }`}
+                >
+                  Approved ✅ ({approvedReviewsCount})
+                </button>
               </div>
             </div>
 
@@ -1192,13 +1271,28 @@ export default function AdminDashboard() {
                 {filteredReviews.map((r) => (
                   <div
                     key={r.id}
-                    className="bg-black/40 border border-white/10 hover:border-[#D4AF37]/40 rounded-xl p-4 flex flex-col justify-between transition-all"
+                    className={`bg-black/40 border rounded-xl p-4 flex flex-col justify-between transition-all ${
+                      r.status === "pending"
+                        ? "border-amber-500/60 shadow-[0_0_15px_rgba(245,158,11,0.15)]"
+                        : "border-white/10 hover:border-[#D4AF37]/40"
+                    }`}
                   >
                     <div>
                       <div className="flex items-start justify-between gap-2 mb-2">
                         <div>
-                          <p className="text-white text-sm font-bold">{r.name}</p>
-                          <p className="text-[10px] text-white/40">{r.date || "Recent"}</p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-white text-sm font-bold">{r.name}</p>
+                            {r.status === "pending" ? (
+                              <span className="text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/40 px-2 py-0.5 rounded-full">
+                                ⏳ Pending Approval
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                                ✓ Live
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-white/40 mt-0.5">{r.date || "Recent"}</p>
                         </div>
                         <div className="flex items-center gap-0.5 text-[#D4AF37]">
                           {[...Array(5)].map((_, i) => (
@@ -1216,19 +1310,34 @@ export default function AdminDashboard() {
                       </p>
                     </div>
 
-                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
-                      <button
-                        onClick={() => handleOpenEditReview(r)}
-                        className="inline-flex items-center gap-1 text-[11px] bg-white/10 hover:bg-white/20 text-white font-medium px-2.5 py-1 rounded-md transition-all cursor-pointer"
-                      >
-                        <Edit3 size={12} /> Edit
-                      </button>
-                      <button
-                        onClick={() => handleDeleteReview(r.id)}
-                        className="inline-flex items-center gap-1 text-[11px] bg-red-500/15 hover:bg-red-500/25 text-red-300 font-medium px-2.5 py-1 rounded-md transition-all cursor-pointer"
-                      >
-                        <Trash2 size={12} /> Delete
-                      </button>
+                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/10 flex-wrap">
+                      <div>
+                        {r.status === "pending" && (
+                          <button
+                            type="button"
+                            onClick={() => approveReview(r.id)}
+                            className="inline-flex items-center gap-1.5 text-xs bg-emerald-500 hover:bg-emerald-400 text-black font-bold px-3 py-1.5 rounded-lg transition-all shadow-md cursor-pointer"
+                            title="Approve and make visible to all customers"
+                          >
+                            <CheckCircle size={13} /> Approve (OK)
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => handleOpenEditReview(r)}
+                          className="inline-flex items-center gap-1 text-[11px] bg-white/10 hover:bg-white/20 text-white font-medium px-2.5 py-1 rounded-md transition-all cursor-pointer"
+                        >
+                          <Edit3 size={12} /> Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteReview(r.id)}
+                          className="inline-flex items-center gap-1 text-[11px] bg-red-500/15 hover:bg-red-500/25 text-red-300 font-medium px-2.5 py-1 rounded-md transition-all cursor-pointer"
+                        >
+                          <Trash2 size={12} /> Delete
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -1320,7 +1429,184 @@ export default function AdminDashboard() {
         )}
 
         {/* ======================================================== */}
-        {/* TAB 4: Customer Activity, Carts & Favorites */}
+        {/* TAB: Table Reservations & VIP Seating */}
+        {/* ======================================================== */}
+        {activeTab === "reservations" && (
+          <div className="bg-white/[0.03] border border-[#D4AF37]/25 rounded-2xl p-6 mb-8">
+            <div className="flex items-center justify-between mb-6 flex-wrap gap-3 pb-5 border-b border-white/10">
+              <div>
+                <h2 className="text-white text-xl font-semibold flex items-center gap-2">
+                  <CalendarCheck size={20} className="text-[#D4AF37]" /> Table Reservations & VIP Seating
+                </h2>
+                <p className="text-xs text-white/50 mt-0.5">
+                  Tamam table bookings yahan show hoti hain. Har booking pehle <strong>Pending</strong> hoti hai, aapke <strong>Approve (OK)</strong> karne par customer ko <strong>Confirmed</strong> show hoti hai.
+                </p>
+              </div>
+
+              {/* Reservation Filter Tabs */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setReservationFilter("all")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    reservationFilter === "all"
+                      ? "bg-[#D4AF37] text-black"
+                      : "bg-white/5 text-white/70 hover:text-white"
+                  }`}
+                >
+                  All ({reservations.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReservationFilter("pending")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+                    reservationFilter === "pending"
+                      ? "bg-amber-500 text-black font-bold"
+                      : reservations.filter((r) => r.status === "pending").length > 0
+                      ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                      : "bg-white/5 text-white/70 hover:text-white"
+                  }`}
+                >
+                  Pending ({reservations.filter((r) => r.status === "pending").length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReservationFilter("confirmed")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    reservationFilter === "confirmed"
+                      ? "bg-emerald-500 text-black font-bold"
+                      : "bg-white/5 text-white/70 hover:text-white"
+                  }`}
+                >
+                  Confirmed ({reservations.filter((r) => r.status === "confirmed").length})
+                </button>
+              </div>
+            </div>
+
+            {/* Reservations Grid */}
+            {filteredReservations.length === 0 ? (
+              <p className="text-sm py-12 text-center text-white/50">Koi table reservation nahi mili.</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredReservations.map((res) => {
+                  const guestWaText = encodeURIComponent(
+                    `Assalam o Alaikum ${res.name}! Al Madina Restaurant ki taraf se aapki Table Booking (ID: ${res.id}) confirm kar di gayi hai. Tashreef awri ka shukriya!`
+                  );
+                  const guestWaUrl = `https://wa.me/92${res.phone?.replace(/^0/, "").replace(/\D/g, "")}?text=${guestWaText}`;
+
+                  return (
+                    <div
+                      key={res.id}
+                      className={`bg-black/40 border rounded-xl p-4 flex flex-col justify-between transition-all ${
+                        res.status === "pending"
+                          ? "border-amber-500/60 shadow-[0_0_15px_rgba(245,158,11,0.15)]"
+                          : "border-white/10 hover:border-[#D4AF37]/40"
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <p className="text-white text-sm font-bold">{res.name}</p>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                res.status === "pending"
+                                  ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                                  : res.status === "confirmed"
+                                  ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                                  : "bg-red-500/20 text-red-300 border-red-500/40"
+                              }`}>
+                                {res.status === "pending"
+                                  ? "⏳ Pending Your OK"
+                                  : res.status === "confirmed"
+                                  ? "✅ Confirmed"
+                                  : "Cancelled"}
+                              </span>
+                            </div>
+                            <p className="text-xs text-[#D4AF37] font-semibold mt-0.5">
+                              📱 {res.phone}
+                            </p>
+                          </div>
+                          <span className="text-[10px] text-white/40">#{res.id}</span>
+                        </div>
+
+                        {/* Details Grid */}
+                        <div className="grid grid-cols-2 gap-2 my-2.5 p-2.5 bg-white/[0.03] border border-white/5 rounded-lg text-xs">
+                          <div>
+                            <span className="text-white/40 block text-[10px]">Date</span>
+                            <span className="text-white font-medium">{res.date}</span>
+                          </div>
+                          <div>
+                            <span className="text-white/40 block text-[10px]">Time</span>
+                            <span className="text-white font-medium">{res.time}</span>
+                          </div>
+                          <div className="col-span-2">
+                            <span className="text-white/40 block text-[10px]">Seating / Guests</span>
+                            <span className="text-white font-medium">{res.guests} Afraad (Family Hall)</span>
+                          </div>
+                        </div>
+
+                        {res.notes && (
+                          <p className="text-xs text-white/75 italic bg-white/[0.02] p-2 rounded border border-white/5 mb-3">
+                            "{res.notes}"
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="flex items-center justify-between gap-2 pt-2.5 border-t border-white/10 flex-wrap">
+                        <div>
+                          {res.status === "pending" ? (
+                            <button
+                              type="button"
+                              onClick={() => updateReservationStatus(res.id, "confirmed")}
+                              className="inline-flex items-center gap-1.5 text-xs bg-emerald-500 hover:bg-emerald-400 text-black font-bold px-3 py-1.5 rounded-lg transition-all shadow-md cursor-pointer"
+                            >
+                              <CheckCircle size={13} /> Approve Table (OK)
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => updateReservationStatus(res.id, "pending")}
+                              className="inline-flex items-center gap-1 text-[11px] bg-white/10 hover:bg-white/20 text-white font-medium px-2.5 py-1 rounded-md transition-all cursor-pointer"
+                            >
+                              Revert to Pending
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          {res.phone && (
+                            <a
+                              href={guestWaUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-[11px] bg-[#25D366]/20 border border-[#25D366]/40 text-[#25D366] hover:bg-[#25D366]/30 px-2.5 py-1 rounded-md font-semibold transition-all"
+                              title="Send WhatsApp confirmation to guest"
+                            >
+                              <MessageSquare size={12} /> WhatsApp
+                            </a>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm("Kiya aap is table booking ko delete karna chahte hain?")) {
+                                deleteReservation(res.id);
+                              }
+                            }}
+                            className="inline-flex items-center gap-1 text-[11px] bg-red-500/15 hover:bg-red-500/25 text-red-300 font-medium px-2 py-1 rounded-md transition-all cursor-pointer"
+                            title="Delete booking"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
         {/* ======================================================== */}
         {activeTab === "customers" && (
           <div className="bg-white/[0.03] border border-[#D4AF37]/25 rounded-2xl p-6 mb-8">

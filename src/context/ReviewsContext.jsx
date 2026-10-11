@@ -11,9 +11,9 @@ const ReviewsContext = createContext(null);
 const STORAGE_KEY = "am_reviews";
 
 const DEFAULT_REVIEWS = [
-  { id: 1, name: "Sara Ahmed", rating: 5, comment: "Best biryani in Karachi, hands down. The delivery was fast too.", date: "2026-06-12" },
-  { id: 2, name: "Bilal Hussain", rating: 4, comment: "Great food and cozy ambiance. Service could be a touch quicker.", date: "2026-06-20" },
-  { id: 3, name: "Fatima Noor", rating: 5, comment: "The mutton karahi tastes just like home cooking. Loved it.", date: "2026-06-28" },
+  { id: 1, name: "Sara Ahmed", rating: 5, comment: "Best biryani in Karachi, hands down. The delivery was fast too.", date: "2026-06-12", status: "approved" },
+  { id: 2, name: "Bilal Hussain", rating: 4, comment: "Great food and cozy ambiance. Service could be a touch quicker.", date: "2026-06-20", status: "approved" },
+  { id: 3, name: "Fatima Noor", rating: 5, comment: "The mutton karahi tastes just like home cooking. Loved it.", date: "2026-06-28", status: "approved" },
 ];
 
 export function ReviewsProvider({ children }) {
@@ -42,6 +42,7 @@ export function ReviewsProvider({ children }) {
             name: d.name,
             rating: Number(d.rating),
             comment: d.comment,
+            status: d.status || "approved",
             date: d.date || (d.created_at ? d.created_at.slice(0, 10) : new Date().toISOString().slice(0, 10)),
           }));
           setReviews(mapped);
@@ -65,6 +66,7 @@ export function ReviewsProvider({ children }) {
     const newReview = {
       id: Date.now(),
       date: new Date().toISOString().slice(0, 10),
+      status: review.status || "pending", // Pending admin approval by default
       ...review,
     };
     setReviews((prev) => [newReview, ...prev]);
@@ -78,8 +80,27 @@ export function ReviewsProvider({ children }) {
           rating: Number(newReview.rating),
           comment: newReview.comment,
           date: newReview.date,
+          status: newReview.status,
         })
         .catch?.((e) => console.warn("[ReviewsContext] Supabase insert note:", e));
+    } catch {}
+    return newReview;
+  };
+
+  const approveReview = (id) => {
+    setReviews((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, status: "approved" } : r))
+    );
+
+    try {
+      supabase
+        .from("reviews")
+        .update({
+          status: "approved",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", id)
+        .catch?.((e) => console.warn("[ReviewsContext] Supabase approve note:", e));
     } catch {}
   };
 
@@ -112,13 +133,15 @@ export function ReviewsProvider({ children }) {
     } catch {}
   };
 
+  // Only calculate public average rating from approved reviews
+  const approvedReviews = reviews.filter((r) => r.status === "approved" || !r.status);
   const averageRating =
-    reviews.length > 0
-      ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
-      : 0;
+    approvedReviews.length > 0
+      ? (approvedReviews.reduce((sum, r) => sum + r.rating, 0) / approvedReviews.length).toFixed(1)
+      : 5.0;
 
   return (
-    <ReviewsContext.Provider value={{ reviews, addReview, updateReview, deleteReview, averageRating }}>
+    <ReviewsContext.Provider value={{ reviews, approvedReviews, addReview, approveReview, updateReview, deleteReview, averageRating }}>
       {children}
     </ReviewsContext.Provider>
   );

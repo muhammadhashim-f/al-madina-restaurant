@@ -17,9 +17,14 @@ import {
   Star,
   CheckCircle2,
   CornerDownRight,
+  RotateCcw,
+  Heart,
+  CalendarCheck,
 } from "lucide-react";
 import { useCart } from "../context/CartContext";
 import { useOrders } from "../context/OrdersContext";
+import { useFavorites } from "../context/FavoritesContext";
+import { useReservations } from "../context/ReservationsContext";
 import { useVIPLoader } from "../context/LoadingContext";
 import { useAuth } from "../context/AuthContext";
 import { saveChatMessage, deleteChatSession } from "../lib/chatService";
@@ -167,10 +172,13 @@ export default function Chatbot() {
 
   const scrollRef = useRef(null);
   const typewriterTimerRef = useRef(null);
-  const { addToCart } = useCart();
+  const { addToCart, items: cartItems } = useCart();
+  const { addToFavorites } = useFavorites();
+  const { addReservation } = useReservations();
   const { addOrder } = useOrders();
   const { triggerLoader } = useVIPLoader();
   const authContext = useAuth();
+  const [sidebarTab, setSidebarTab] = useState("active"); // "active" | "archived" | "trash"
 
   const currentUser = authContext?.session?.user || null;
   const customerName = currentUser?.user_metadata?.full_name || (currentUser?.email ? currentUser.email.split("@")[0] : "Guest Customer");
@@ -364,9 +372,277 @@ export default function Chatbot() {
   const processResponse = async (userText) => {
     const raw = userText.trim();
     const clean = normalizeInput(raw);
+    const lowerRaw = raw.toLowerCase();
     const _lang = detectLanguage(raw);
 
-    // Call server-side real Gemini AI first
+    // ========================================================
+    // 1. SECTION NAVIGATION (e.g. "go to menu section", "menu kholo", "open offers")
+    // ========================================================
+    const isNavIntent =
+      clean.includes("go to") ||
+      clean.includes("le jao") ||
+      clean.includes("le jaon") ||
+      clean.includes("le chalo") ||
+      clean.includes("kholo") ||
+      clean.includes("open") ||
+      clean.includes("dikhayein") ||
+      clean.includes("dikhao") ||
+      clean.includes("section");
+
+    if (isNavIntent) {
+      let targetSection = null;
+      let sectionName = "";
+
+      if (clean.includes("menu") || clean.includes("khana") || clean.includes("dish")) {
+        targetSection = "menu";
+        sectionName = "Menu Section";
+      } else if (clean.includes("deal") || clean.includes("offer") || clean.includes("discount")) {
+        targetSection = "offers";
+        sectionName = "Shahi Deals & Offers Section";
+      } else if (clean.includes("review") || clean.includes("feedback") || clean.includes("tareef")) {
+        targetSection = "reviews";
+        sectionName = "Customer Reviews Section";
+      } else if (clean.includes("booking") || clean.includes("table") || clean.includes("reservation") || clean.includes("seat")) {
+        targetSection = "reservations";
+        sectionName = "Table Reservations Section";
+      } else if (clean.includes("about") || clean.includes("bawarchi") || clean.includes("chef") || clean.includes("history")) {
+        targetSection = "about";
+        sectionName = "About Us (Hamari Tareekh)";
+      } else if (clean.includes("gallery") || clean.includes("photo") || clean.includes("tasweer")) {
+        targetSection = "gallery";
+        sectionName = "Food Gallery";
+      } else if (clean.includes("contact") || clean.includes("location") || clean.includes("map") || clean.includes("pata")) {
+        targetSection = "contact";
+        sectionName = "Contact & Live Location Map";
+      }
+
+      if (targetSection) {
+        setTimeout(() => {
+          const el = document.getElementById(targetSection) || document.querySelector(`#${targetSection}`);
+          if (el) el.scrollIntoView({ behavior: "smooth" });
+        }, 120);
+
+        return {
+          text: `Yeh len, yeh raha aapka ${sectionName} open hai! ✨ Kiya ab koi lazeez cheez Add to Cart ya Favorites mein shamil karni hai, ya main aapke liye order confirm kar doon?`,
+          product: null,
+          suggestedQuestions: [
+            "🛒 Ye dish Cart mein add karein",
+            "💖 Favorites mein shamil karein",
+            "📦 Mera Order book karein",
+            "🍽️ Shahi Table reserve karein",
+          ],
+        };
+      }
+    }
+
+    // ========================================================
+    // 2. MULTI-DISH ADD TO CART / ADD TO FAVORITES
+    // (e.g. "ek mutton aur ek seekh kabab aur ek samosa add to cart kr do")
+    // ========================================================
+    const isAddToCartIntent =
+      clean.includes("add to cart") ||
+      clean.includes("cart me") ||
+      clean.includes("cart mein") ||
+      clean.includes("cart shamil") ||
+      clean.includes("dastarkhwan me");
+
+    const isFavoritesIntent =
+      clean.includes("favorite") ||
+      clean.includes("favorites") ||
+      clean.includes("favourite") ||
+      clean.includes("pasandeeda") ||
+      clean.includes("fav me") ||
+      clean.includes("like");
+
+    if (isAddToCartIntent || isFavoritesIntent) {
+      const matchedList = [];
+
+      // Mutton / Handi / Karahi
+      if (
+        clean.includes("mutton") ||
+        clean.includes("bakra") ||
+        clean.includes("karahi") ||
+        lowerRaw.includes("button") ||
+        lowerRaw.includes("buttn") ||
+        lowerRaw.includes("batan")
+      ) {
+        let qty = 1;
+        if (clean.includes("2 mutton") || clean.includes("do mutton") || clean.includes("2 karahi")) qty = 2;
+        if (clean.includes("3 mutton") || clean.includes("teen mutton")) qty = 3;
+        matchedList.push({ product: MENU_RECOMMENDATIONS.karahi, quantity: qty });
+      }
+
+      // Seekh Kabab / BBQ
+      if (clean.includes("seekh") || clean.includes("kabab") || clean.includes("kebab") || clean.includes("bbq")) {
+        let qty = 1;
+        if (clean.includes("2 seekh") || clean.includes("do seekh") || clean.includes("2 kabab")) qty = 2;
+        if (clean.includes("3 seekh") || clean.includes("teen seekh")) qty = 3;
+        matchedList.push({ product: MENU_RECOMMENDATIONS.kebab, quantity: qty });
+      }
+
+      // Samosa
+      if (clean.includes("samosa") || clean.includes("samose") || clean.includes("samosay")) {
+        let qty = 1;
+        if (clean.includes("2 samosa") || clean.includes("do samosa")) qty = 2;
+        if (clean.includes("3 samosa") || clean.includes("teen samosa")) qty = 3;
+        matchedList.push({ product: MENU_RECOMMENDATIONS.samosa, quantity: qty });
+      }
+
+      // Biryani
+      if (clean.includes("biryani") || clean.includes("chawal")) {
+        let qty = 1;
+        if (clean.includes("2 biryani") || clean.includes("do biryani")) qty = 2;
+        if (clean.includes("3 biryani") || clean.includes("teen biryani")) qty = 3;
+        matchedList.push({ product: MENU_RECOMMENDATIONS.biryani, quantity: qty });
+      }
+
+      // Dal Makhani
+      if (clean.includes("makhani") || clean.includes("daal") || clean.includes("dal")) {
+        matchedList.push({ product: MENU_RECOMMENDATIONS.makhani, quantity: 1 });
+      }
+
+      // Gulab Jamun
+      if (clean.includes("gulab") || clean.includes("meetha") || clean.includes("dessert")) {
+        matchedList.push({ product: MENU_RECOMMENDATIONS.dessert, quantity: 1 });
+      }
+
+      // Kashmiri Chai
+      if (clean.includes("chai") || clean.includes("pink tea")) {
+        matchedList.push({ product: MENU_RECOMMENDATIONS.chai, quantity: 1 });
+      }
+
+      if (matchedList.length > 0) {
+        if (isAddToCartIntent) {
+          matchedList.forEach((it) => {
+            addToCart(
+              {
+                id: it.product.id,
+                name: it.product.name,
+                price: it.product.price,
+                image: it.product.image,
+              },
+              it.quantity
+            );
+          });
+          const summary = matchedList
+            .map((it) => `• ${it.quantity}x ${it.product.name} (Rs ${it.product.price * it.quantity})`)
+            .join("\n");
+          return {
+            text: `Zabardast Bhai! Aapke kehne par shahi dastarkhwan cart mein yeh items add kar diye gaye hain: 🛒\n\n${summary}\n\nKiya aap abhi Karachi Home Delivery order place karna chahte hain?`,
+            product: matchedList[0]?.product,
+            suggestedQuestions: [
+              "📦 Abhi Order Confirm Karein",
+              "🧾 Mera mukammal bill batao",
+              "Kashmiri Chai bhi add karein",
+            ],
+          };
+        } else {
+          matchedList.forEach((it) => {
+            addToFavorites(it.product.id);
+          });
+          const summary = matchedList.map((it) => `• ${it.product.name}`).join("\n");
+          return {
+            text: `Wah Shandar Choice! Maine yeh items aapki VIP Favorites list mein save kar diye hain: 💖\n\n${summary}\n\nAap website ke top par Heart icon par click kar ke inhein kabhi bhi ek click mein mangwa sakte hain!`,
+            product: matchedList[0]?.product,
+            suggestedQuestions: [
+              "🛒 Inhein Cart mein shamil karein",
+              "Menu Section dikhayein",
+              "Table book karein",
+            ],
+          };
+        }
+      }
+    }
+
+    // ========================================================
+    // 3. TABLE BOOKING VIA CHATBOT
+    // (e.g. "table book karni hai", "table chahiye")
+    // ========================================================
+    const isTableBookingIntent =
+      clean.includes("table book") ||
+      clean.includes("table booking") ||
+      clean.includes("table chahiye") ||
+      clean.includes("seat book") ||
+      clean.includes("table reserve") ||
+      clean.includes("family hall");
+
+    if (isTableBookingIntent) {
+      let guests = 2;
+      const guestMatch = clean.match(/(\d+)\s*(afraad|people|persons|guest|guests|banday)/);
+      if (guestMatch) guests = parseInt(guestMatch[1], 10);
+      else if (clean.includes("char") || clean.includes("4")) guests = 4;
+      else if (clean.includes("family")) guests = 6;
+
+      const tomorrow = new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString().slice(0, 10);
+      const newBooking = addReservation({
+        name: customerName,
+        phone: "03070769139",
+        date: tomorrow,
+        time: "20:30",
+        guests,
+        notes: "Booked automatically via Al Madina AI Shahi Host",
+        status: "pending",
+      });
+
+      return {
+        text: `👑 Shahi Table Booking Request Receive Ho Gayi Hai!\n\n📋 Booking ID: #${newBooking.id}\n👤 Mehmaan: ${newBooking.name}\n👥 VIP Seating: ${newBooking.guests} Afraad (Family Hall)\n📅 Tareeq: ${newBooking.date} · ⏰ Waqt: ${newBooking.time}\n\n⏳ **Status: Pending Owner Approval**\n\n(Note: Pehle yeh booking pending rahegi, jaise hi restaurant owner check kar ke **OK** karenge to status Confirmed ho jayega. Yeh details aapki Booking History mein bhi live save ho chuki hain!)`,
+        suggestedQuestions: [
+          "📅 Booking History Dekhein",
+          "📱 WhatsApp Owner se rabta",
+          "Menu se dishes order karein",
+        ],
+      };
+    }
+
+    // ========================================================
+    // 4. ORDER PLACEMENT VIA CHATBOT
+    // (e.g. "order confirm kardo", "order place kardo", "mangwa do")
+    // ========================================================
+    const isDirectOrderIntent =
+      clean.includes("order place") ||
+      clean.includes("order confirm") ||
+      clean.includes("order bhej do") ||
+      clean.includes("order book") ||
+      clean.includes("order dena") ||
+      clean.includes("mangwa do") ||
+      clean.includes("delivery bhej do");
+
+    if (isDirectOrderIntent) {
+      const orderItems =
+        cartItems?.length > 0
+          ? cartItems
+          : [
+              { id: 4, name: "Chicken Biryani (2 Plates)", price: 680, quantity: 2, image: "/Images/menu/Chicken Biryani.jpg" },
+              { id: 3, name: "Mutton Karahi (1 KG Handi)", price: 1450, quantity: 1, image: "/Images/menu/Mutton Karahi.jpg" },
+            ];
+      const orderTotal = orderItems.reduce((sum, it) => sum + it.price * (it.quantity || 1), 0) + 150;
+
+      const newOrder = addOrder({
+        items: orderItems,
+        fulfillment: "delivery",
+        paymentMethod: "cod",
+        status: "awaiting_approval", // Pending owner WhatsApp confirmation!
+        customer: {
+          name: customerName,
+          phone: "03070769139",
+          address: "Karachi Home Delivery (Awaiting WhatsApp confirmation)",
+        },
+        total: orderTotal,
+      });
+
+      return {
+        text: `Bhai order complete successfully ho chuka hy ab aap whatsapp (${RESTAURANT_PHONE} / +92 307 0769139) pr payment wageera okay kare pir jese hi owner ki trf se okay ka massge ay ga to pir apko tarcking baick website pr live location me show ki jay gi k kahan Aap ka parsal aa giya hy 🛵\n\n(Bhai yaad rahe k jb tk ownr okay nahi kare ga tb tk baick tracking me show nahi ki jay gi k kahan aa gai kun k abhi order pendding me hy).`,
+        orderPlaced: newOrder,
+        whatsappSupport: true,
+        suggestedQuestions: [
+          `🛵 Live Tracking Dekhein (#${newOrder.id})`,
+          "💬 Owner WhatsApp par OK karein",
+          "Table bhi reserve karein",
+        ],
+      };
+    }
+
+    // Call server-side real Gemini AI for rich conversational replies
     const geminiReply = await callServerGemini(raw);
 
     // Determine relevant dish attachment for interactive card
@@ -610,10 +886,11 @@ export default function Chatbot() {
     setInput("");
     setIsTyping(true);
 
+    // 2.2 seconds typing indicator with animated logo per user instructions
     setTimeout(async () => {
       const response = await processResponse(text);
       streamBotMessage(response, updatedMessages);
-    }, 350);
+    }, 2200);
   };
 
   // Chat Sessions Management
@@ -623,12 +900,14 @@ export default function Chatbot() {
       id: newId,
       title: "New Chat",
       archived: false,
+      trash: false,
       createdAt: Date.now(),
       messages: [INITIAL_MESSAGE],
     };
     setSessions((prev) => [newChat, ...prev]);
     setCurrentChatId(newId);
     setSidebarOpen(false);
+    setSidebarTab("active");
   };
 
   const handleRenameChat = (chatId) => {
@@ -640,33 +919,66 @@ export default function Chatbot() {
     setTitleInput("");
   };
 
+  // Archive / Unarchive toggle
   const handleArchiveChat = (chatId) => {
     setSessions((prev) =>
       prev.map((s) => (s.id === chatId ? { ...s, archived: !s.archived } : s))
     );
   };
 
-  const handleDeleteChat = (chatId) => {
-    // Delete from Supabase as well
+  // Move chat to Trash
+  const handleMoveToTrash = (chatId) => {
+    setSessions((prev) => {
+      const updated = prev.map((s) =>
+        s.id === chatId ? { ...s, trash: true, trashedAt: Date.now() } : s
+      );
+      const remainingActive = updated.filter((s) => !s.trash && !s.archived);
+      if (currentChatId === chatId && remainingActive.length > 0) {
+        setCurrentChatId(remainingActive[0].id);
+      }
+      return updated;
+    });
+  };
+
+  // Restore chat from Trash to the VERY TOP of active chats
+  const handleRestoreChat = (chatId) => {
+    setSessions((prev) => {
+      const target = prev.find((s) => s.id === chatId);
+      if (!target) return prev;
+      const restored = { ...target, trash: false, archived: false, updatedAt: Date.now() };
+      const others = prev.filter((s) => s.id !== chatId);
+      return [restored, ...others];
+    });
+    setCurrentChatId(chatId);
+    setSidebarTab("active");
+  };
+
+  // Permanently Delete chat forever
+  const handlePermanentDelete = (chatId) => {
     deleteChatSession(chatId);
 
-    if (sessions.length <= 1) {
-      setSessions([
-        {
-          id: "chat_" + Date.now(),
-          title: "New Chat",
-          archived: false,
-          createdAt: Date.now(),
-          messages: [INITIAL_MESSAGE],
-        },
-      ]);
-      return;
-    }
-    const remaining = sessions.filter((s) => s.id !== chatId);
-    setSessions(remaining);
-    if (currentChatId === chatId) {
-      setCurrentChatId(remaining[0].id);
-    }
+    setSessions((prev) => {
+      const remaining = prev.filter((s) => s.id !== chatId);
+      if (remaining.length === 0) {
+        const freshId = "chat_" + Date.now();
+        setCurrentChatId(freshId);
+        return [
+          {
+            id: freshId,
+            title: "New Chat",
+            archived: false,
+            trash: false,
+            createdAt: Date.now(),
+            messages: [INITIAL_MESSAGE],
+          },
+        ];
+      }
+      if (currentChatId === chatId) {
+        const nextActive = remaining.find((s) => !s.trash) || remaining[0];
+        setCurrentChatId(nextActive.id);
+      }
+      return remaining;
+    });
   };
 
   return (
@@ -797,11 +1109,33 @@ export default function Chatbot() {
           opacity: 0.4;
           transform: none;
         }
+        .am-typing-indicator-box {
+          display: inline-flex;
+          align-items: center;
+          gap: 9px;
+          padding: 8px 14px;
+          background: rgba(20, 18, 14, 0.95);
+          border: 1px solid rgba(212, 175, 55, 0.4);
+          border-radius: 16px;
+          box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5), 0 0 10px rgba(212, 175, 55, 0.15);
+        }
+        .am-typing-logo {
+          width: 22px;
+          height: 22px;
+          border-radius: 50%;
+          border: 1px solid #D4AF37;
+          object-fit: cover;
+          animation: am-logo-spin 2.5s linear infinite;
+        }
+        @keyframes am-logo-spin {
+          0% { transform: rotate(0deg) scale(0.95); }
+          50% { transform: rotate(180deg) scale(1.08); }
+          100% { transform: rotate(360deg) scale(0.95); }
+        }
         .am-typing-dots {
           display: flex;
           align-items: center;
           gap: 4px;
-          padding: 8px 12px;
         }
         .am-typing-dots span {
           width: 6px;
@@ -813,8 +1147,8 @@ export default function Chatbot() {
         .am-typing-dots span:nth-child(2) { animation-delay: 0.2s; }
         .am-typing-dots span:nth-child(3) { animation-delay: 0.4s; }
         @keyframes am-dot-pulse {
-          0%, 80%, 100% { transform: scale(0.6); opacity: 0.3; }
-          40% { transform: scale(1.2); opacity: 1; }
+          0%, 80%, 100% { transform: scale(0.6); opacity: 0.35; }
+          40% { transform: scale(1.25); opacity: 1; }
         }
       `}</style>
 
@@ -894,10 +1228,11 @@ export default function Chatbot() {
 
               {/* Absolute Drawer from Top to Bottom on Left */}
               <div
-                className="absolute inset-y-0 left-0 w-[285px] max-w-[85%] bg-[#12100C]/98 border-r border-[#D4AF37]/35 z-40 shadow-2xl flex flex-col p-3.5 backdrop-blur-md animate-fade-in text-xs text-white/80"
+                className="absolute inset-y-0 left-0 w-[295px] max-w-[88%] bg-[#12100C]/98 border-r border-[#D4AF37]/35 z-40 shadow-2xl flex flex-col p-3 backdrop-blur-md animate-fade-in text-xs text-white/80"
                 style={{ boxShadow: "10px 0 30px rgba(0,0,0,0.8)" }}
               >
-                <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-2.5 shrink-0">
+                {/* Header */}
+                <div className="flex items-center justify-between pb-2.5 border-b border-white/10 mb-2 shrink-0">
                   <span className="font-bold text-[#F0DFA0] flex items-center gap-1.5 text-xs">
                     <Archive size={14} className="text-[#D4AF37]" /> Chat Sessions History
                   </span>
@@ -921,79 +1256,222 @@ export default function Chatbot() {
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
-                  {sessions.map((sess) => (
-                    <div
-                      key={sess.id}
-                      className={`p-2.5 rounded-lg flex items-center justify-between gap-2 group transition-colors ${
-                        sess.id === currentChatId
-                          ? "bg-[#D4AF37]/20 text-[#FFF2A3] border border-[#D4AF37]/40 shadow-sm"
-                          : "hover:bg-white/5 text-white/70"
-                      }`}
-                    >
-                      {editingTitleId === sess.id ? (
-                        <div className="flex items-center gap-1 flex-1">
-                          <input
-                            type="text"
-                            value={titleInput}
-                            onChange={(e) => setTitleInput(e.target.value)}
-                            className="bg-black/60 border border-white/20 rounded px-1.5 py-0.5 text-xs text-white flex-1"
-                            autoFocus
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleRenameChat(sess.id)}
-                            className="text-emerald-400 p-0.5 hover:text-emerald-300 cursor-pointer"
-                          >
-                            <Check size={12} />
-                          </button>
-                        </div>
-                      ) : (
-                        <div
-                          className="flex-1 truncate cursor-pointer"
-                          onClick={() => {
-                            setCurrentChatId(sess.id);
-                            setSidebarOpen(false);
-                          }}
-                        >
-                          <p className="truncate font-semibold">{sess.title}</p>
-                          <p className="text-[10px] text-white/40">
-                            {sess.messages?.length || 1} messages · {new Date(sess.createdAt || Date.now()).toLocaleDateString()}
-                          </p>
-                        </div>
-                      )}
+                {/* 3 Tabs: Active, Archived, Trash */}
+                <div className="flex items-center bg-black/50 border border-white/10 rounded-lg p-0.5 mb-2.5 shrink-0 gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setSidebarTab("active")}
+                    className={`flex-1 py-1 rounded text-[10.5px] font-semibold text-center transition-all cursor-pointer ${
+                      sidebarTab === "active"
+                        ? "bg-[#D4AF37] text-black shadow-sm font-bold"
+                        : "text-white/60 hover:text-white"
+                    }`}
+                  >
+                    Active ({sessions.filter((s) => !s.trash && !s.archived).length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSidebarTab("archived")}
+                    className={`flex-1 py-1 rounded text-[10.5px] font-semibold text-center transition-all cursor-pointer ${
+                      sidebarTab === "archived"
+                        ? "bg-[#D4AF37] text-black shadow-sm font-bold"
+                        : "text-white/60 hover:text-white"
+                    }`}
+                  >
+                    Archived ({sessions.filter((s) => !s.trash && s.archived).length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSidebarTab("trash")}
+                    className={`flex-1 py-1 rounded text-[10.5px] font-semibold text-center transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                      sidebarTab === "trash"
+                        ? "bg-red-500 text-white shadow-sm font-bold"
+                        : "text-white/60 hover:text-red-300"
+                    }`}
+                  >
+                    <Trash2 size={10} /> Trash ({sessions.filter((s) => s.trash).length})
+                  </button>
+                </div>
 
-                      <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingTitleId(sess.id);
-                            setTitleInput(sess.title);
-                          }}
-                          className="p-1 hover:text-[#D4AF37] cursor-pointer"
-                          title="Rename Chat"
-                        >
-                          <Edit2 size={12} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleArchiveChat(sess.id)}
-                          className={`p-1 hover:text-amber-400 cursor-pointer ${sess.archived ? "text-amber-400" : ""}`}
-                          title="Archive"
-                        >
-                          <Archive size={12} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteChat(sess.id)}
-                          className="p-1 hover:text-red-400 cursor-pointer"
-                          title="Delete Chat"
-                        >
-                          <Trash2 size={12} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                {/* Sessions List */}
+                <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
+                  {/* TAB 1: ACTIVE CHATS */}
+                  {sidebarTab === "active" && (
+                    <>
+                      {sessions.filter((s) => !s.trash && !s.archived).length === 0 ? (
+                        <p className="text-center text-white/40 text-[11px] py-8">Koi active chat nahi hai.</p>
+                      ) : (
+                        sessions
+                          .filter((s) => !s.trash && !s.archived)
+                          .map((sess) => (
+                            <div
+                              key={sess.id}
+                              className={`p-2.5 rounded-lg flex items-center justify-between gap-2 group transition-colors ${
+                                sess.id === currentChatId
+                                  ? "bg-[#D4AF37]/20 text-[#FFF2A3] border border-[#D4AF37]/40 shadow-sm"
+                                  : "hover:bg-white/5 text-white/70"
+                              }`}
+                            >
+                              {editingTitleId === sess.id ? (
+                                <div className="flex items-center gap-1 flex-1">
+                                  <input
+                                    type="text"
+                                    value={titleInput}
+                                    onChange={(e) => setTitleInput(e.target.value)}
+                                    className="bg-black/60 border border-white/20 rounded px-1.5 py-0.5 text-xs text-white flex-1"
+                                    autoFocus
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRenameChat(sess.id)}
+                                    className="text-emerald-400 p-0.5 hover:text-emerald-300 cursor-pointer"
+                                  >
+                                    <Check size={12} />
+                                  </button>
+                                </div>
+                              ) : (
+                                <div
+                                  className="flex-1 truncate cursor-pointer"
+                                  onClick={() => {
+                                    setCurrentChatId(sess.id);
+                                    setSidebarOpen(false);
+                                  }}
+                                >
+                                  <p className="truncate font-semibold">{sess.title}</p>
+                                  <p className="text-[10px] text-white/40">
+                                    {sess.messages?.length || 1} messages · {new Date(sess.createdAt || Date.now()).toLocaleDateString()}
+                                  </p>
+                                </div>
+                              )}
+
+                              <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingTitleId(sess.id);
+                                    setTitleInput(sess.title);
+                                  }}
+                                  className="p-1 hover:text-[#D4AF37] cursor-pointer"
+                                  title="Rename Chat"
+                                >
+                                  <Edit2 size={12} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleArchiveChat(sess.id)}
+                                  className="p-1 hover:text-amber-400 cursor-pointer"
+                                  title="Archive (Move to Archive tab)"
+                                >
+                                  <Archive size={12} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleMoveToTrash(sess.id)}
+                                  className="p-1 hover:text-red-400 cursor-pointer"
+                                  title="Delete (Move to Trash)"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                      )}
+                    </>
+                  )}
+
+                  {/* TAB 2: ARCHIVED CHATS */}
+                  {sidebarTab === "archived" && (
+                    <>
+                      {sessions.filter((s) => !s.trash && s.archived).length === 0 ? (
+                        <p className="text-center text-white/40 text-[11px] py-8">Koi archived chat nahi hai.</p>
+                      ) : (
+                        sessions
+                          .filter((s) => !s.trash && s.archived)
+                          .map((sess) => (
+                            <div
+                              key={sess.id}
+                              className="p-2.5 rounded-lg flex items-center justify-between gap-2 bg-white/[0.03] border border-white/5 hover:border-[#D4AF37]/30 text-white/70 transition-colors"
+                            >
+                              <div
+                                className="flex-1 truncate cursor-pointer"
+                                onClick={() => {
+                                  setCurrentChatId(sess.id);
+                                  setSidebarOpen(false);
+                                }}
+                              >
+                                <p className="truncate font-semibold">{sess.title}</p>
+                                <p className="text-[10px] text-amber-400/80">Archived · Mehfooz</p>
+                              </div>
+
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleArchiveChat(sess.id)}
+                                  className="px-2 py-0.5 bg-[#D4AF37]/20 border border-[#D4AF37]/40 text-[#F0DFA0] rounded text-[10px] font-semibold cursor-pointer hover:bg-[#D4AF37]/30"
+                                  title="Unarchive to Active"
+                                >
+                                  Unarchive
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleMoveToTrash(sess.id)}
+                                  className="p-1 text-white/40 hover:text-red-400 cursor-pointer"
+                                  title="Move to Trash"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                      )}
+                    </>
+                  )}
+
+                  {/* TAB 3: TRASH (Cannot open chat, but Restore to top & Permanent Delete) */}
+                  {sidebarTab === "trash" && (
+                    <>
+                      {sessions.filter((s) => s.trash).length === 0 ? (
+                        <p className="text-center text-white/40 text-[11px] py-8">Trash khaalii hai.</p>
+                      ) : (
+                        sessions
+                          .filter((s) => s.trash)
+                          .map((sess) => (
+                            <div
+                              key={sess.id}
+                              className="p-2.5 rounded-lg flex items-center justify-between gap-2 bg-red-950/20 border border-red-500/20 text-white/60"
+                            >
+                              <div className="flex-1 truncate">
+                                <p className="truncate font-medium line-through text-white/50">{sess.title}</p>
+                                <p className="text-[10px] text-red-400">In Trash (Chat band hai)</p>
+                              </div>
+
+                              <div className="flex items-center gap-1 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => handleRestoreChat(sess.id)}
+                                  className="px-2 py-1 bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500/50 text-emerald-300 rounded text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                                  title="Restore Chat (Sabhi chats ke top par wapas aayegi)"
+                                >
+                                  <RotateCcw size={10} /> Restore
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (window.confirm("Kiya aap waqai is chat ko hamesha keliye permanently delete karna chahte hain?")) {
+                                      handlePermanentDelete(sess.id);
+                                    }
+                                  }}
+                                  className="p-1 bg-red-600/30 hover:bg-red-600/50 border border-red-500/50 text-red-300 rounded text-[10px] cursor-pointer transition-colors"
+                                  title="Permanently Delete"
+                                >
+                                  <Trash2 size={11} />
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
             </>
@@ -1158,12 +1636,26 @@ export default function Chatbot() {
               </div>
             )}
 
-            {/* Typing Dots Indicator */}
+            {/* Typing Indicator with Animated Restaurant Logo & Dots */}
             {isTyping && (
-              <div className="am-bubble bot am-typing-dots">
-                <span />
-                <span />
-                <span />
+              <div className="am-typing-indicator-box animate-fade-in my-1">
+                <img
+                  src="/Images/logo/almadina.png"
+                  alt="Al Madina"
+                  className="am-typing-logo"
+                  onError={(e) => {
+                    // Fallback to stylized gold badge if image loading delay
+                    e.target.style.display = 'none';
+                  }}
+                />
+                <div className="am-typing-dots">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+                <span className="text-[10px] text-amber-300/80 font-medium tracking-wide">
+                  Al Madina AI Shahi Host...
+                </span>
               </div>
             )}
           </div>

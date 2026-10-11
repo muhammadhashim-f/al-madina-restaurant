@@ -39,7 +39,21 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const profileRef = useRef(null);
   const navigate = useNavigate();
+
+  // Close profile dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (profileRef.current && !profileRef.current.contains(e.target)) {
+        setProfileOpen(false);
+      }
+    };
+    if (profileOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [profileOpen]);
 
   const handleSearch = (e) => {
     if (e && e.preventDefault) e.preventDefault();
@@ -93,6 +107,7 @@ export default function Navbar() {
   const handleActionNav = (e, path, title, subtitle, duration = 1800) => {
     e.preventDefault();
     setMobileOpen(false);
+    setProfileOpen(false);
     triggerLoader(title, subtitle, duration, () => navigate(path));
   };
 
@@ -410,34 +425,67 @@ export default function Navbar() {
 
               {/* Auth / Profile */}
               {isLoggedIn ? (
-                <div className="relative">
+                <div className="relative" ref={profileRef}>
                   <button
                     onClick={() => setProfileOpen(!profileOpen)}
-                    className="am-icon-btn flex items-center gap-2 pl-1 pr-2 py-1 rounded-full"
+                    className="am-icon-btn flex items-center gap-2 pl-1 pr-2 py-1 rounded-full cursor-pointer"
                   >
                     {user?.user_metadata?.avatar_url ? (
                       <img
-                      src={user.user_metadata.avatar_url}
-                      alt="Profile"
-                      className="w-8 h-8 rounded-full object-cover"
-                      style={{ border: "1.5px solid rgba(212,175,55,0.5)" }}
+                        src={user.user_metadata.avatar_url}
+                        alt="Profile"
+                        className="w-8 h-8 rounded-full object-cover"
+                        style={{ border: "1.5px solid rgba(212,175,55,0.5)" }}
                       />
                     ) : (
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-[#0A2F23] text-xs font-semibold"
-                    style={{ background: "linear-gradient(135deg, #F0DFA0, #D4AF37)" }}
-                    >
-                      {initials}
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-[#0A2F23] text-xs font-semibold"
+                        style={{ background: "linear-gradient(135deg, #F0DFA0, #D4AF37)" }}
+                      >
+                        {initials}
                       </div>
                     )}
                     <ChevronDown size={14} className="am-white" />
                   </button>
                   {profileOpen && (
-                    <div className="am-mobile-panel absolute right-0 mt-2 w-48 bg-[#181818] border border-white/10 rounded-lg shadow-lg py-2 text-sm">
-                      <a href="/profile" onClick={(e) => handleActionNav(e, "/profile", "👤 Al Madina Profile", "Aapka personal shahi profile load ho raha hai...", 1500)} className="block px-4 py-2 text-white hover:bg-white/10">My Profile</a>
-                      <a href="/orders" onClick={(e) => handleActionNav(e, "/orders", "📦 Shahi Order History", "Aapke pichle orders ki tafseelat...", 1600)} className="block px-4 py-2 text-white hover:bg-white/10">Order History</a>
-                      <a href="/reservations" onClick={(e) => handleActionNav(e, "/reservations", "🍽️ Table Reservations", "VIP family seating status...", 1600)} className="block px-4 py-2 text-white hover:bg-white/10">Reservations</a>
+                    <div className="am-mobile-panel absolute right-0 mt-2 w-48 bg-[#181818] border border-white/10 rounded-lg shadow-xl py-2 text-sm z-50">
+                      <a
+                        href="/profile"
+                        onClick={(e) => {
+                          setProfileOpen(false);
+                          handleActionNav(e, "/profile", "👤 Al Madina Profile", "Aapka personal shahi profile load ho raha hai...", 1500);
+                        }}
+                        className="block px-4 py-2 text-white hover:bg-white/10 transition-colors"
+                      >
+                        My Profile
+                      </a>
+                      <a
+                        href="/orders"
+                        onClick={(e) => {
+                          setProfileOpen(false);
+                          handleActionNav(e, "/orders", "📦 Shahi Order History", "Aapke pichle orders ki tafseelat...", 1600);
+                        }}
+                        className="block px-4 py-2 text-white hover:bg-white/10 transition-colors"
+                      >
+                        Order History
+                      </a>
+                      <a
+                        href="/reservations"
+                        onClick={(e) => {
+                          setProfileOpen(false);
+                          handleActionNav(e, "/reservations", "🍽️ Table Reservations", "VIP family seating status...", 1600);
+                        }}
+                        className="block px-4 py-2 text-white hover:bg-white/10 transition-colors"
+                      >
+                        Reservations
+                      </a>
                       <div className="my-1 border-t border-white/10" />
-                      <button onClick={handleLogout} className="w-full text-left block px-4 py-2 text-[#E8846A] hover:bg-white/10">Log out</button>
+                      <button
+                        onClick={handleLogout}
+                        className="w-full text-left block px-4 py-2 text-[#E8846A] hover:bg-white/10 transition-colors cursor-pointer"
+                      >
+                        Log out
+                      </button>
                     </div>
                   )}
                 </div>

@@ -61,6 +61,15 @@ export default function Auth() {
   const [infoMessage, setInfoMessage] = useState("");
   const [googleModal, setGoogleModal] = useState(false);
   const [customGoogleEmail, setCustomGoogleEmail] = useState("");
+  const [showMoreAccounts, setShowMoreAccounts] = useState(false);
+  const [savedAccounts, setSavedAccounts] = useState(() => {
+    try {
+      const saved = localStorage.getItem("am_saved_google_accounts");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
 
   const { signUp, signIn, signInWithGoogle, isLoggedIn } = useAuth();
   const { triggerLoader } = useVIPLoader();
@@ -633,18 +642,18 @@ export default function Auth() {
         </p>
       </div>
 
-      {/* Google Account Chooser Modal */}
+      {/* Google Account Chooser Modal (Device-Specific, No Hardcoded Emails) */}
       {googleModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
           <div className="bg-[#181818] border border-[#D4AF37]/40 rounded-2xl p-6 max-w-sm w-full shadow-2xl relative">
             <button
               onClick={() => setGoogleModal(false)}
-              className="absolute top-4 right-4 text-white/50 hover:text-white"
+              className="absolute top-4 right-4 text-white/50 hover:text-white cursor-pointer"
             >
               <X size={18} />
             </button>
 
-            <div className="flex items-center gap-3 mb-5">
+            <div className="flex items-center gap-3 mb-4">
               <GoogleIcon />
               <div>
                 <h3 className="text-white text-base font-semibold leading-tight">Sign in with Google</h3>
@@ -652,43 +661,75 @@ export default function Auth() {
               </div>
             </div>
 
-            <p className="text-xs text-white/70 mb-3">Choose an account:</p>
+            {/* If accounts are saved on this browser/device */}
+            {savedAccounts.length > 0 ? (
+              <div className="mb-4">
+                <p className="text-xs text-white/70 mb-2.5">Saved accounts on this device:</p>
+                <div className="space-y-2">
+                  {/* Show primary/recent account */}
+                  <button
+                    type="button"
+                    onClick={() => handleSelectGoogleAccount(savedAccounts[0].email, savedAccounts[0].name)}
+                    className="w-full flex items-center gap-3 p-3 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-[#D4AF37]/50 rounded-xl text-left transition-all cursor-pointer"
+                  >
+                    <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-emerald-700 to-teal-500 text-white font-bold flex items-center justify-center text-sm shrink-0">
+                      {savedAccounts[0].name ? savedAccounts[0].name[0].toUpperCase() : "G"}
+                    </div>
+                    <div className="overflow-hidden flex-1">
+                      <p className="text-sm text-white font-medium truncate">{savedAccounts[0].email}</p>
+                      <p className="text-xs text-white/40">{savedAccounts[0].name || "Google Account"}</p>
+                    </div>
+                  </button>
 
-            {/* Quick 1-tap option 1 */}
-            <div className="space-y-2.5 mb-5">
-              <button
-                type="button"
-                onClick={() => handleSelectGoogleAccount("ah1572986@gmail.com", "Al Madina Customer")}
-                className="w-full flex items-center gap-3 p-3 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-[#D4AF37]/50 rounded-xl text-left transition-all"
-              >
-                <div className="w-9 h-9 rounded-full bg-emerald-700 text-white font-bold flex items-center justify-center text-sm shrink-0">
-                  A
+                  {/* More accounts if multiple exist on this device */}
+                  {savedAccounts.length > 1 && (
+                    <>
+                      {showMoreAccounts && (
+                        <div className="space-y-2 pt-1">
+                          {savedAccounts.slice(1).map((acc, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => handleSelectGoogleAccount(acc.email, acc.name)}
+                              className="w-full flex items-center gap-3 p-3 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-[#D4AF37]/50 rounded-xl text-left transition-all cursor-pointer"
+                            >
+                              <div className="w-9 h-9 rounded-full bg-[#D4AF37] text-black font-bold flex items-center justify-center text-sm shrink-0">
+                                {acc.name ? acc.name[0].toUpperCase() : "G"}
+                              </div>
+                              <div className="overflow-hidden flex-1">
+                                <p className="text-sm text-white font-medium truncate">{acc.email}</p>
+                                <p className="text-xs text-white/40">{acc.name || "Google Account"}</p>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setShowMoreAccounts(!showMoreAccounts)}
+                        className="w-full py-1.5 text-xs text-[#D4AF37] hover:underline text-center cursor-pointer"
+                      >
+                        {showMoreAccounts ? "▲ Hide other accounts" : `▼ More Google accounts on this device (${savedAccounts.length - 1})`}
+                      </button>
+                    </>
+                  )}
                 </div>
-                <div className="overflow-hidden">
-                  <p className="text-sm text-white font-medium truncate">ah1572986@gmail.com</p>
-                  <p className="text-xs text-white/40">Active Account</p>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleSelectGoogleAccount("guest@almadina.pk", "Karachi Foodie")}
-                className="w-full flex items-center gap-3 p-3 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-[#D4AF37]/50 rounded-xl text-left transition-all"
-              >
-                <div className="w-9 h-9 rounded-full bg-[#D4AF37] text-black font-bold flex items-center justify-center text-sm shrink-0">
-                  K
-                </div>
-                <div className="overflow-hidden">
-                  <p className="text-sm text-white font-medium truncate">guest@almadina.pk</p>
-                  <p className="text-xs text-white/40">VIP Guest Account</p>
-                </div>
-              </button>
-            </div>
+              </div>
+            ) : (
+              <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-center mb-4">
+                <p className="text-xs text-white/70">
+                  Is browser par koi Google account pehle se save nahi hai.
+                </p>
+                <p className="text-[11px] text-white/40 mt-1">
+                  Neeche apna Gmail address likhein ya naya account banayein.
+                </p>
+              </div>
+            )}
 
             {/* Custom Google Email input */}
             <div className="border-t border-white/10 pt-4">
-              <p className="text-xs text-white/60 mb-2">Or enter any Gmail address:</p>
-              <div className="flex gap-2">
+              <p className="text-xs text-white/70 mb-2">Use another Google account:</p>
+              <div className="flex gap-2 mb-3">
                 <input
                   type="email"
                   value={customGoogleEmail}
@@ -700,13 +741,27 @@ export default function Auth() {
                   type="button"
                   onClick={() => {
                     if (customGoogleEmail.trim()) {
-                      handleSelectGoogleAccount(customGoogleEmail.trim(), customGoogleEmail.split("@")[0]);
+                      const email = customGoogleEmail.trim();
+                      const name = email.split("@")[0];
+                      handleSelectGoogleAccount(email, name);
                     }
                   }}
-                  className="px-3 py-2 bg-[#D4AF37] text-black text-xs font-semibold rounded-lg hover:bg-[#F0DFA0] transition-colors"
+                  className="px-3 py-2 bg-[#D4AF37] text-black text-xs font-semibold rounded-lg hover:bg-[#F0DFA0] transition-colors cursor-pointer shrink-0"
                 >
                   Continue
                 </button>
+              </div>
+
+              {/* Create New Google Account button */}
+              <div className="text-center pt-2 border-t border-white/5">
+                <a
+                  href="https://accounts.google.com/signup"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs text-[#F0DFA0] hover:underline"
+                >
+                  <Plus size={13} /> Naya Google Account banayein (Create Account)
+                </a>
               </div>
             </div>
           </div>
