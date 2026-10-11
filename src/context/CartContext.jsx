@@ -28,14 +28,14 @@ export function CartProvider({ children }) {
       const total = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
       supabase
         .from("carts")
-        .insert({
+        .upsert({
           id: "cart_active_session",
           customer_identifier: "active_customer",
           items: items,
           total: total,
           updated_at: new Date().toISOString(),
         })
-        .catch?.(() => {});
+        .catch?.((err) => console.warn("[CartContext] Supabase sync note:", err));
     } catch {}
   }, [items]);
 

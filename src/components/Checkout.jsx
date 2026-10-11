@@ -31,6 +31,17 @@ export default function Checkout() {
   const [placing, setPlacing] = useState(false);
   const [placeError, setPlaceError] = useState("");
 
+  // Pre-fill user contact info if logged in
+  React.useEffect(() => {
+    if (user) {
+      setForm((prev) => ({
+        ...prev,
+        name: prev.name || user.user_metadata?.full_name || "Hakim Bhai",
+        phone: prev.phone || user.user_metadata?.phone || "03070769139",
+      }));
+    }
+  }, [user]);
+
   const deliveryFee = fulfillment === "delivery" ? 150 : 0;
   const grandTotal = cartTotal + deliveryFee;
 
@@ -240,19 +251,25 @@ export default function Checkout() {
             </Link>
           </div>
         ) : !isLoggedIn ? (
-          <div className="text-center py-24 max-w-sm mx-auto">
+          <div className="text-center py-20 max-w-md mx-auto bg-black/40 border border-[#D4AF37]/35 p-8 rounded-2xl shadow-2xl backdrop-blur-md">
             <div
-              className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-5"
+              className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4"
               style={{ background: "rgba(212,175,55,0.12)", border: "1px solid rgba(212,175,55,0.4)" }}
             >
               <Lock size={22} style={{ color: "#D4AF37" }} />
             </div>
-            <h3 className="text-white text-lg font-semibold mb-2">Login required to order</h3>
-            <p className="text-sm mb-6" style={{ color: "rgba(255,255,255,0.55)" }}>
-              For order security and tracking, please log in or create an account before placing your order.
+            <h3 className="text-white text-xl font-bold mb-2" style={{ fontFamily: "'Amiri', serif" }}>
+              Login Required to Place Order
+            </h3>
+            <p className="text-xs mb-6 text-white/70 leading-relaxed">
+              Order security aur live GPS bike tracking ke liye account login zaroori hai. Login ya Sign up karte hi aap <strong className="text-[#D4AF37]">seedha yahin wapis aa kar apna order continue kar sakenge</strong>, aur aapka cart bilkul mehfooz rahega!
             </p>
-            <Link to="/login" className="am-place-btn inline-block px-8">
-              Log in / Sign up
+            <Link
+              to="/login?redirect=/checkout"
+              state={{ from: "/checkout" }}
+              className="am-place-btn inline-block px-8 font-bold shadow-lg"
+            >
+              Log in / Sign up to Continue Order →
             </Link>
           </div>
         ) : (

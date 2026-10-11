@@ -1633,9 +1633,7 @@ export default function AdminDashboard() {
               </div>
 
               <p className="text-xs text-white/70 mb-3">
-                Agar aapne Supabase mein abhi tak <code className="text-[#D4AF37]">customer_chats</code> table nahi banaya,
-                toh Supabase Dashboard ke <strong>SQL Editor</strong> mein jaa kar niche diya gaya SQL code paste karein aur
-                <strong> "Run"</strong> dabayein:
+                Supabase mein <strong className="text-[#D4AF37]">Orders, Reviews, Carts, Favorites, aur Customer Chats</strong> ke tamam tables banane ke liye Supabase Dashboard ke <strong>SQL Editor</strong> (New Query) mein jaa kar niche diya gaya All-in-One SQL code paste karein aur <strong>"Run"</strong> dabayein:
               </p>
 
               <div className="relative mb-4">

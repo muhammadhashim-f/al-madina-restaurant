@@ -27,13 +27,13 @@ export function FavoritesProvider({ children }) {
     try {
       supabase
         .from("favorites")
-        .insert({
+        .upsert({
           id: "fav_active_session",
           customer_identifier: "active_customer",
           favorite_ids: favorites.map((f) => ({ id: f.id, name: f.name, price: f.price })),
           updated_at: new Date().toISOString(),
         })
-        .catch?.(() => {});
+        .catch?.((err) => console.warn("[FavoritesContext] Supabase sync note:", err));
     } catch {}
   }, [favorites]);
 

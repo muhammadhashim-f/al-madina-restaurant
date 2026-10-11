@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import {
   Mail,
   Lock,
@@ -66,10 +66,14 @@ export default function Auth() {
   const { triggerLoader } = useVIPLoader();
   const { openPolicy } = usePolicy();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const searchParams = new URLSearchParams(location.search);
+  const redirectTarget = searchParams.get("redirect") || location.state?.from || "/";
 
   React.useEffect(() => {
-    if (isLoggedIn) navigate("/");
-  }, [isLoggedIn, navigate]);
+    if (isLoggedIn) navigate(redirectTarget, { replace: true });
+  }, [isLoggedIn, navigate, redirectTarget]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -165,7 +169,7 @@ export default function Auth() {
         return;
       }
 
-      navigate("/");
+      navigate(redirectTarget, { replace: true });
     } else {
       const { error } = await signIn({
         email: form.email,
@@ -183,7 +187,7 @@ export default function Auth() {
         "Al Madina Restaurant profile data verify ho raha hai..."
       );
       setLoading(false);
-      navigate("/");
+      navigate(redirectTarget, { replace: true });
     }
   };
 
@@ -199,7 +203,7 @@ export default function Auth() {
     await triggerLoader("Google Secure Login", "Al Madina Account sync ho raha hai...", 1800);
     setLoading(false);
     setGoogleModal(false);
-    navigate("/");
+    navigate(redirectTarget, { replace: true });
   };
 
   return (

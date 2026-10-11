@@ -129,6 +129,8 @@ function App() {
                   <Routes>
                     <Route path="/" element={<HomePage />} />
                     <Route path="/login" element={<Auth />} />
+                    <Route path="/signup" element={<Auth />} />
+                    <Route path="/auth" element={<Auth />} />
                     <Route path="/reservations" element={<Reservations />} />
                     <Route path="/cart" element={<Cart />} />
                     <Route path="/checkout" element={<Checkout />} />

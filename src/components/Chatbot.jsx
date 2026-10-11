@@ -207,12 +207,32 @@ export default function Chatbot() {
     }
   };
 
-  // Open Chatbot with VIP Loader
+  // Open Chatbot with VIP Loader and Start New Chat
   const handleOpenChatbot = () => {
+    // Automatically start a fresh new conversation as requested by user
+    setSessions((prev) => {
+      const latest = prev[0];
+      if (latest && latest.messages?.length === 1 && latest.messages[0]?.from === "bot") {
+        setCurrentChatId(latest.id);
+        return prev;
+      }
+      const newId = "chat_" + Date.now();
+      const newChat = {
+        id: newId,
+        title: "New Chat",
+        archived: false,
+        createdAt: Date.now(),
+        messages: [INITIAL_MESSAGE],
+      };
+      setCurrentChatId(newId);
+      return [newChat, ...prev];
+    });
+    setSidebarOpen(false);
+
     triggerLoader(
       "👑 Al Madina AI Shahi Host",
       "AI Assistant se rabta qaim ho raha hai...",
-      1200,
+      800,
       () => setOpen(true)
     );
   };
@@ -863,97 +883,120 @@ export default function Chatbot() {
             </div>
           </div>
 
-          {/* Sidebar Drawer: Chat History (ChatGPT style) */}
+          {/* Sidebar Drawer: Chat History (Overlay Drawer on Left, Top to Bottom) */}
           {sidebarOpen && (
-            <div className="bg-[#12100C] border-b border-[#D4AF37]/20 p-3 max-h-56 overflow-y-auto animate-fade-in text-xs text-white/80">
-              <div className="flex items-center justify-between pb-2 border-b border-white/10 mb-2">
-                <span className="font-bold text-[#F0DFA0] flex items-center gap-1">
-                  <Archive size={13} /> Chat Sessions History
-                </span>
-                <button
-                  type="button"
-                  onClick={handleNewChat}
-                  className="px-2 py-1 rounded bg-[#D4AF37]/20 text-[#F0DFA0] hover:bg-[#D4AF37]/30 flex items-center gap-1 text-[11px]"
-                >
-                  <Plus size={11} /> New Chat
-                </button>
-              </div>
+            <>
+              {/* Semi-transparent Backdrop Overlay */}
+              <div
+                onClick={() => setSidebarOpen(false)}
+                className="absolute inset-0 bg-black/65 backdrop-blur-xs z-30 cursor-pointer animate-fade-in"
+              />
 
-              <div className="space-y-1">
-                {sessions.map((sess) => (
-                  <div
-                    key={sess.id}
-                    className={`p-2 rounded-lg flex items-center justify-between gap-2 group transition-colors ${
-                      sess.id === currentChatId
-                        ? "bg-[#D4AF37]/20 text-[#FFF2A3] border border-[#D4AF37]/40"
-                        : "hover:bg-white/5 text-white/70"
-                    }`}
-                  >
-                    {editingTitleId === sess.id ? (
-                      <div className="flex items-center gap-1 flex-1">
-                        <input
-                          type="text"
-                          value={titleInput}
-                          onChange={(e) => setTitleInput(e.target.value)}
-                          className="bg-black/60 border border-white/20 rounded px-1.5 py-0.5 text-xs text-white flex-1"
-                          autoFocus
-                        />
+              {/* Absolute Drawer from Top to Bottom on Left */}
+              <div
+                className="absolute inset-y-0 left-0 w-[285px] max-w-[85%] bg-[#12100C]/98 border-r border-[#D4AF37]/35 z-40 shadow-2xl flex flex-col p-3.5 backdrop-blur-md animate-fade-in text-xs text-white/80"
+                style={{ boxShadow: "10px 0 30px rgba(0,0,0,0.8)" }}
+              >
+                <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-2.5 shrink-0">
+                  <span className="font-bold text-[#F0DFA0] flex items-center gap-1.5 text-xs">
+                    <Archive size={14} className="text-[#D4AF37]" /> Chat Sessions History
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={handleNewChat}
+                      className="px-2 py-1 rounded bg-[#D4AF37]/20 text-[#F0DFA0] hover:bg-[#D4AF37]/30 flex items-center gap-1 text-[11px] font-semibold transition-colors cursor-pointer"
+                      title="New Chat"
+                    >
+                      <Plus size={11} /> New
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSidebarOpen(false)}
+                      className="p-1 text-white/50 hover:text-white rounded hover:bg-white/10 transition-colors cursor-pointer"
+                      title="Close History"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
+                  {sessions.map((sess) => (
+                    <div
+                      key={sess.id}
+                      className={`p-2.5 rounded-lg flex items-center justify-between gap-2 group transition-colors ${
+                        sess.id === currentChatId
+                          ? "bg-[#D4AF37]/20 text-[#FFF2A3] border border-[#D4AF37]/40 shadow-sm"
+                          : "hover:bg-white/5 text-white/70"
+                      }`}
+                    >
+                      {editingTitleId === sess.id ? (
+                        <div className="flex items-center gap-1 flex-1">
+                          <input
+                            type="text"
+                            value={titleInput}
+                            onChange={(e) => setTitleInput(e.target.value)}
+                            className="bg-black/60 border border-white/20 rounded px-1.5 py-0.5 text-xs text-white flex-1"
+                            autoFocus
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRenameChat(sess.id)}
+                            className="text-emerald-400 p-0.5 hover:text-emerald-300 cursor-pointer"
+                          >
+                            <Check size={12} />
+                          </button>
+                        </div>
+                      ) : (
+                        <div
+                          className="flex-1 truncate cursor-pointer"
+                          onClick={() => {
+                            setCurrentChatId(sess.id);
+                            setSidebarOpen(false);
+                          }}
+                        >
+                          <p className="truncate font-semibold">{sess.title}</p>
+                          <p className="text-[10px] text-white/40">
+                            {sess.messages?.length || 1} messages · {new Date(sess.createdAt || Date.now()).toLocaleDateString()}
+                          </p>
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100">
                         <button
                           type="button"
-                          onClick={() => handleRenameChat(sess.id)}
-                          className="text-emerald-400 p-0.5 hover:text-emerald-300"
+                          onClick={() => {
+                            setEditingTitleId(sess.id);
+                            setTitleInput(sess.title);
+                          }}
+                          className="p-1 hover:text-[#D4AF37] cursor-pointer"
+                          title="Rename Chat"
                         >
-                          <Check size={12} />
+                          <Edit2 size={12} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleArchiveChat(sess.id)}
+                          className={`p-1 hover:text-amber-400 cursor-pointer ${sess.archived ? "text-amber-400" : ""}`}
+                          title="Archive"
+                        >
+                          <Archive size={12} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteChat(sess.id)}
+                          className="p-1 hover:text-red-400 cursor-pointer"
+                          title="Delete Chat"
+                        >
+                          <Trash2 size={12} />
                         </button>
                       </div>
-                    ) : (
-                      <div
-                        className="flex-1 truncate cursor-pointer"
-                        onClick={() => {
-                          setCurrentChatId(sess.id);
-                          setSidebarOpen(false);
-                        }}
-                      >
-                        <p className="truncate font-medium">{sess.title}</p>
-                        <p className="text-[10px] text-white/40">
-                          {sess.messages?.length || 1} messages
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingTitleId(sess.id);
-                          setTitleInput(sess.title);
-                        }}
-                        className="p-1 hover:text-[#D4AF37]"
-                        title="Rename Chat"
-                      >
-                        <Edit2 size={12} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleArchiveChat(sess.id)}
-                        className={`p-1 hover:text-amber-400 ${sess.archived ? "text-amber-400" : ""}`}
-                        title="Archive"
-                      >
-                        <Archive size={12} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteChat(sess.id)}
-                        className="p-1 hover:text-red-400"
-                        title="Delete Chat"
-                      >
-                        <Trash2 size={12} />
-                      </button>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
+            </>
           )}
 
           {/* Scroll Direction Controls Helper Bar (Top & Down Only per user instructions) */}
