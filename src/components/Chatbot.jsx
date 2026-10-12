@@ -289,12 +289,18 @@ export default function Chatbot() {
   };
 
   // Call Server-Side Gemini API Proxy (/api/chat)
-  const callServerGemini = async (prompt) => {
+  const callServerGemini = async (prompt, history = []) => {
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: prompt }),
+        body: JSON.stringify({
+          message: prompt,
+          history: history.slice(-8).map((entry) => ({
+            role: entry.role === "model" || entry.from === "bot" ? "model" : "user",
+            text: entry.text,
+          })),
+        }),
       });
       if (!res.ok) return null;
       const data = await res.json();
@@ -427,6 +433,19 @@ export default function Chatbot() {
       const activeItems =
         conversationContext.pendingProposal?.items || cartItems;
 
+      const phoneMatch = raw.match(/(?:\+?92|0)\d[\d\s-]{8,}/);
+      const addressMatch = raw.match(/(?:address|pata|delivery address)\s*[:\-]?\s*(.+)/i);
+      if (!phoneMatch || !addressMatch || addressMatch[1].trim().length < 8) {
+        return {
+          text: "Bhai, order ko sahi aur safe tareeqe se place karne ke liye abhi aapka asli phone number aur delivery address chahiye. Main koi dummy details use nahi karunga. Is format mein bhej dein: Confirm order, phone: 03XXXXXXXXX, address: House/Street/Area, Karachi.",
+          suggestedQuestions: [
+            "Mera bill batao",
+            "Cart dikhao",
+            "Order confirm karne ke liye details kya chahiye?",
+          ],
+        };
+      }
+
       if (!activeItems || activeItems.length === 0) {
         return {
           text: "Bhai jaan, aapki cart is waqt khali hai! Pehle menu se koi dish muntakhib farmayein (maslan: 2 Chicken Biryani ya 1 Mutton Karahi), phir hum foran order place kar denge! 🛒",
@@ -446,8 +465,8 @@ export default function Chatbot() {
         status: "awaiting_approval",
         customer: {
           name: customerName,
-          phone: "0300-1234567",
-          address: "Karachi Home Delivery (Awaiting WhatsApp Confirmation)",
+          phone: phoneMatch[0].replace(/[\s-]/g, ""),
+          address: addressMatch[1].trim(),
         },
         total: calculated.grandTotal,
       });
@@ -693,7 +712,17 @@ export default function Chatbot() {
       }
 
       // 4. Add specific dish to favorites
-      const dishToFav = findDishByQuery(raw) || MENU_ITEMS[0];
+      const dishToFav = findDishByQuery(raw);
+      if (!dishToFav) {
+        return {
+          text: "Bhai, kis dish ko Favorites mein save karna hai? Menu ka exact naam bata dein, jaise Chicken Biryani ya Mutton Karahi. Main andazay se koi doosri dish save nahi karunga.",
+          suggestedQuestions: [
+            "Chicken Biryani favorite karo",
+            "Mutton Karahi favorite karo",
+            "Meri favorites list dikhao",
+          ],
+        };
+      }
       addFavorite(dishToFav);
       return {
         text: `Wah Shandar Choice! "${dishToFav.name}" (Rs ${dishToFav.price}) aapki VIP Favorites list mein save kar diya gaya hai! 💖`,
@@ -749,26 +778,44 @@ export default function Chatbot() {
         }
       }
 
-      // 3. New Booking
-      let guests = 2;
-      const guestMatch = clean.match(/(\d+)\s*(afraad|people|persons|guest|guests|banday)/);
-      if (guestMatch) guests = parseInt(guestMatch[1], 10);
-      else if (clean.includes("char") || clean.includes("4")) guests = 4;
-      else if (clean.includes("family")) guests = 6;
+      // 3. Create a booking only when the customer clearly requests one
+      // and supplies the actual details. Never invent date, time, guests, or phone.
+      const explicitBookingRequest =
+        /\b(book|reserve|reservation)\b/.test(clean) ||
+        clean.includes("booking kar") ||
+        clean.includes("table chahiye") ||
+        clean.includes("table book") ||
+        clean.includes("table reserve");
+      const guestMatch = clean.match(/(\d+)\s*(afraad|people|persons|guest|guests|banday|log)/);
+      const guests = guestMatch ? parseInt(guestMatch[1], 10) : null;
+      const phoneMatch = raw.match(/(?:\+?92|0)\d[\d\s-]{8,}/);
+      const timeMatch = clean.match(/\b(\d{1,2}(?::\d{2})?\s*(?:pm|am)?|\d{1,2}\s*baje)\b/i);
+      const dateMatch = clean.match(/\b(20\d{2}-\d{2}-\d{2})\b/);
+      const hasDate = Boolean(dateMatch || /\b(today|tomorrow|aaj|kal)\b/.test(clean));
+      const hasTime = Boolean(timeMatch || /\b(\d{1,2})\s*(?:pm|am|baje)\b/.test(clean));
 
-      let bookingTime = "20:30";
-      const timeMatch = clean.match(/(\d{1,2}(?::\d{2})?\s*(?:pm|am)?)/i);
-      if (timeMatch && (clean.includes("pm") || clean.includes("baje") || clean.includes("at"))) {
-        bookingTime = timeMatch[1];
+      if (!explicitBookingRequest || !guests || !hasDate || !hasTime || !phoneMatch) {
+        return {
+          text: "Bhai, table ka zikr karne se main booking create nahi karunga. Agar aap waqai table book karna chahte hain to apni request is format mein bhejein: Book table, date: tomorrow (ya YYYY-MM-DD), time: 8:00 PM, guests: 4, phone: 03XXXXXXXXX. Booking details milne par hi request save hogi.",
+          suggestedQuestions: [
+            "Kal 8 PM, 4 guests ke liye table book karni hai — phone number bhi doon?",
+            "Meri bookings dikhao",
+            "Table reservation section kholo",
+          ],
+        };
       }
 
-      const tomorrow = new Date(Date.now() + 1000 * 60 * 60 * 24)
-        .toISOString()
-        .slice(0, 10);
+      let bookingDate = dateMatch?.[1] || "";
+      if (!bookingDate) {
+        const base = new Date();
+        if (/\b(tomorrow|kal)\b/.test(clean)) base.setDate(base.getDate() + 1);
+        bookingDate = base.toISOString().slice(0, 10);
+      }
+      const bookingTime = timeMatch[1].replace(/\s*baje\b/i, "").trim();
       const newBooking = addReservation({
         name: customerName,
-        phone: "0300-1234567",
-        date: tomorrow,
+        phone: phoneMatch[0].replace(/[\s-]/g, ""),
+        date: bookingDate,
         time: bookingTime,
         guests,
         notes: "Booked via Al Madina AI Shahi Host",
@@ -882,7 +929,13 @@ export default function Chatbot() {
     // --------------------------------------------------------
     // J. SERVER GEMINI AI CALL (Real conversational assistant)
     // --------------------------------------------------------
-    const geminiReply = await callServerGemini(raw);
+    const geminiReply = await callServerGemini(
+      raw,
+      messages.slice(-8).map((entry) => ({
+        role: entry.from === "bot" ? "model" : "user",
+        text: entry.text,
+      }))
+    );
     if (geminiReply) {
       return {
         text: geminiReply,
