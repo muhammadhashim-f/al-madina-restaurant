@@ -155,7 +155,10 @@ CREATE POLICY "Reservations delete admin only" ON public.reservations
   FOR DELETE TO authenticated
   USING (public.is_admin());
 
--- Important: after running this migration, set the intended staff user's role via the
--- Supabase SQL Editor as project owner, for example:
--- UPDATE public.profiles SET role = 'admin' WHERE id = '<AUTH_USER_UUID>';
+-- Important: after running this migration, create/authorize the intended staff profile
+-- via Supabase SQL Editor as project owner (replace the UUID with the Auth user's UUID):
+-- INSERT INTO public.profiles (id, full_name, email, role)
+-- SELECT id, COALESCE(raw_user_meta_data ->> 'full_name', ''), COALESCE(email, ''), 'admin'
+-- FROM auth.users WHERE id = '<AUTH_USER_UUID>'
+-- ON CONFLICT (id) DO UPDATE SET role = 'admin';
 -- Do not use the demo admin password shown in the old frontend.
