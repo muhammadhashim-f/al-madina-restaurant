@@ -289,12 +289,18 @@ export default function Chatbot() {
   };
 
   // Call Server-Side Gemini API Proxy (/api/chat)
-  const callServerGemini = async (prompt) => {
+  const callServerGemini = async (prompt, history = []) => {
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: prompt }),
+        body: JSON.stringify({
+          message: prompt,
+          history: history.slice(-8).map((entry) => ({
+            role: entry.role === "model" || entry.from === "bot" ? "model" : "user",
+            text: entry.text,
+          })),
+        }),
       });
       if (!res.ok) return null;
       const data = await res.json();
@@ -424,8 +430,7 @@ export default function Chatbot() {
       clean.includes("order book kar do");
 
     if (isConfirmIntent) {
-      const activeItems =
-        conversationContext.pendingProposal?.items || cartItems;
+      const activeItems = cartItems;
 
       if (!activeItems || activeItems.length === 0) {
         return {
@@ -438,6 +443,19 @@ export default function Chatbot() {
         };
       }
 
+      const phoneMatch = raw.match(/(?:\+?92|0)\d[\d\s-]{8,}/);
+      const addressMatch = raw.match(/(?:address|pata|delivery address)\s*[:\-]?\s*(.+)/i);
+      if (!phoneMatch || !addressMatch || addressMatch[1].trim().length < 8) {
+        return {
+          text: "Bhai, order ko sahi aur safe tareeqe se place karne ke liye abhi aapka asli phone number aur delivery address chahiye. Main koi dummy details use nahi karunga. Is format mein bhej dein: Confirm order, phone: 03XXXXXXXXX, address: House/Street/Area, Karachi.",
+          suggestedQuestions: [
+            "Mera bill batao",
+            "Cart dikhao",
+            "Order confirm karne ke liye details kya chahiye?",
+          ],
+        };
+      }
+
       const calculated = calculateBill(activeItems);
       const newOrder = addOrder({
         items: calculated.items,
@@ -446,8 +464,8 @@ export default function Chatbot() {
         status: "awaiting_approval",
         customer: {
           name: customerName,
-          phone: "0300-1234567",
-          address: "Karachi Home Delivery (Awaiting WhatsApp Confirmation)",
+          phone: phoneMatch[0].replace(/[\s-]/g, ""),
+          address: addressMatch[1].trim(),
         },
         total: calculated.grandTotal,
       });
@@ -493,9 +511,15 @@ export default function Chatbot() {
       const parsedToRemove = parseMultiItemOrder(raw);
       if (parsedToRemove.length > 0) {
         parsedToRemove.forEach((p) => {
-          removeFromCart(p.item.id);
+          const inCart = cartItems.find((item) => item.id === p.item.id);
+          if (!inCart) return;
+          if (p.quantity < inCart.quantity) {
+            updateQuantity(p.item.id, inCart.quantity - p.quantity);
+          } else {
+            removeFromCart(p.item.id);
+          }
         });
-        const summary = parsedToRemove.map((p) => `• ${p.item.name}`).join("\n");
+        const summary = parsedToRemove.map((p) => `• ${p.quantity}x ${p.item.name}`).join("\n");
         return {
           text: `Bhai, aapke hukum par cart se yeh items remove kar diye gaye hain: 🗑️\n\n${summary}\n\nKiya aap mojooda cart ka updated bill dekhna chahte hain?`,
           suggestedQuestions: [
@@ -683,6 +707,40 @@ export default function Chatbot() {
         };
       }
 
+      // Remove one specific dish from Favorites before handling bulk clearing.
+      const isRemovingOneFavorite =
+        clean.includes("remove") ||
+        clean.includes("remove from") ||
+        clean.includes("hata do") ||
+        clean.includes("nikal do") ||
+        clean.includes("unfavorite") ||
+        clean.includes("favorite se");
+      if (isRemovingOneFavorite) {
+        const dishToRemove = findDishByQuery(raw);
+        if (!dishToRemove) {
+          return {
+            text: "Bhai, kaunsi dish Favorites se remove karni hai? Dish ka naam bata dein.",
+            suggestedQuestions: [
+              "Chicken Biryani favorites se remove karo",
+              "Mutton Karahi favorites se remove karo",
+              "Meri favorites list dikhao",
+            ],
+          };
+        }
+        if (!favorites.some((item) => item.id === dishToRemove.id)) {
+          return {
+            text: `"${dishToRemove.name}" aapki Favorites list mein nahi hai, is liye kuch remove nahi kiya.`,
+            suggestedQuestions: ["Meri favorites list dikhao", "Menu dekho"],
+          };
+        }
+        removeFavorite(dishToRemove.id);
+        return {
+          text: `"${dishToRemove.name}" ko Favorites se remove kar diya hai.`,
+          product: dishToRemove,
+          suggestedQuestions: ["Meri favorites list dikhao", "Menu dekho"],
+        };
+      }
+
       // 3. Clear favorites
       if (clean.includes("remove all") || clean.includes("clear") || clean.includes("khatam")) {
         clearFavorites();
@@ -693,7 +751,17 @@ export default function Chatbot() {
       }
 
       // 4. Add specific dish to favorites
-      const dishToFav = findDishByQuery(raw) || MENU_ITEMS[0];
+      const dishToFav = findDishByQuery(raw);
+      if (!dishToFav) {
+        return {
+          text: "Bhai, kis dish ko Favorites mein save karna hai? Menu ka exact naam bata dein, jaise Chicken Biryani ya Mutton Karahi. Main andazay se koi doosri dish save nahi karunga.",
+          suggestedQuestions: [
+            "Chicken Biryani favorite karo",
+            "Mutton Karahi favorite karo",
+            "Meri favorites list dikhao",
+          ],
+        };
+      }
       addFavorite(dishToFav);
       return {
         text: `Wah Shandar Choice! "${dishToFav.name}" (Rs ${dishToFav.price}) aapki VIP Favorites list mein save kar diya gaya hai! 💖`,
@@ -717,18 +785,33 @@ export default function Chatbot() {
       clean.includes("family hall");
 
     if (isTableIntent) {
-      // 1. Cancel booking
+      // 1. Cancellation must identify the booking and confirm intent.
       if (clean.includes("cancel") || clean.includes("mansookh")) {
-        if (reservations.length > 0) {
-          const lastRes = reservations[0];
-          deleteReservation(lastRes.id);
+        const bookingIdMatch = raw.match(/(?:booking|reservation)?\s*#?\s*(RES-?\d+|\d{4,})/i);
+        const hasExplicitCancelConfirmation =
+          clean.includes("confirm cancel") ||
+          clean.includes("cancel booking #") ||
+          clean.includes("cancel reservation #") ||
+          clean.includes("booking cancel kar do #");
+        if (!bookingIdMatch || !hasExplicitCancelConfirmation) {
           return {
-            text: `Bhai, aapki table booking #${lastRes.id} (${lastRes.guests} afraad, ${lastRes.date}) cancel kar di gayi hai.`,
-            suggestedQuestions: ["Nayi table book karein", "Menu dekhein"],
+            text: "Bhai, ghalti se booking cancel na ho is liye main bina booking ID aur clear confirmation ke cancel nahi karunga. Apni booking ID ke sath likhein: Confirm cancel booking #RES-12345. Pehle apni booking history check kar sakte hain.",
+            suggestedQuestions: ["Meri bookings dikhao", "Nayi table book karein", "Menu dekhein"],
           };
         }
+        const requestedId = bookingIdMatch[1].replace(/^RES-?/i, "");
+        const targetBooking = reservations.find((r) =>
+          String(r.id).replace(/^RES-?/i, "") === requestedId
+        );
+        if (!targetBooking) {
+          return {
+            text: "Bhai, yeh booking ID current booking list mein nahi mili. Apni booking history check karke sahi ID bhej dein.",
+            suggestedQuestions: ["Meri bookings dikhao", "Menu dekhein"],
+          };
+        }
+        deleteReservation(targetBooking.id);
         return {
-          text: "Aapki koi active booking record mein mojood nahi hai jise cancel kiya ja sakay.",
+          text: `Booking #${targetBooking.id} (${targetBooking.guests} afraad, ${targetBooking.date}) cancel kar di gayi hai.`,
           suggestedQuestions: ["Nayi table book karein", "Menu dekhein"],
         };
       }
@@ -749,26 +832,75 @@ export default function Chatbot() {
         }
       }
 
-      // 3. New Booking
-      let guests = 2;
-      const guestMatch = clean.match(/(\d+)\s*(afraad|people|persons|guest|guests|banday)/);
-      if (guestMatch) guests = parseInt(guestMatch[1], 10);
-      else if (clean.includes("char") || clean.includes("4")) guests = 4;
-      else if (clean.includes("family")) guests = 6;
+      // 3. Create a booking only when the customer clearly requests one
+      // and supplies the actual details. Never invent date, time, guests, or phone.
+      const explicitBookingRequest =
+        /\b(book|reserve|reservation)\b/.test(clean) ||
+        clean.includes("booking kar") ||
+        clean.includes("table chahiye") ||
+        clean.includes("table book") ||
+        clean.includes("table reserve");
+      const guestMatch = clean.match(/(\d+)\s*(afraad|people|persons|guest|guests|banday|log)/);
+      const guests = guestMatch ? parseInt(guestMatch[1], 10) : null;
+      const phoneMatch = raw.match(/(?:\+?92|0)\d[\d\s-]{8,}/);
+      // A bare number such as "4 guests" must not be mistaken for a time.
+      const timeMatch = clean.match(/\b(\d{1,2}:\d{2}\s*(?:pm|am)?|\d{1,2}\s*(?:pm|am|baje))\b/i);
+      const dateMatch = clean.match(/\b(20\d{2}-\d{2}-\d{2})\b/);
+      const relativeDateMatch = clean.match(/\b(today|tomorrow|aaj|kal)\b/);
+      const hasDate = Boolean(dateMatch || relativeDateMatch);
+      const timeParts = timeMatch?.[1].match(/^(\d{1,2})(?::(\d{2}))?\s*(pm|am|baje)?$/i);
+      const timeHour = timeParts ? Number(timeParts[1]) : NaN;
+      const timeMinute = timeParts?.[2] ? Number(timeParts[2]) : 0;
+      const timeSuffix = timeParts?.[3]?.toLowerCase();
+      const validTime = Boolean(
+        timeParts &&
+        timeMinute >= 0 && timeMinute <= 59 &&
+        (timeSuffix === "am" || timeSuffix === "pm"
+          ? timeHour >= 1 && timeHour <= 12
+          : timeHour >= 0 && timeHour <= 23)
+      );
+      const dateParts = dateMatch ? dateMatch[1].split("-").map(Number) : null;
+      const parsedDate = dateParts
+        ? new Date(dateParts[0], dateParts[1] - 1, dateParts[2])
+        : null;
+      const dateIsValid = !dateMatch || (
+        parsedDate &&
+        !Number.isNaN(parsedDate.getTime()) &&
+        parsedDate.getFullYear() === dateParts[0] &&
+        parsedDate.getMonth() === dateParts[1] - 1 &&
+        parsedDate.getDate() === dateParts[2]
+      );
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const dateIsNotPast = !dateMatch || (parsedDate && parsedDate >= today);
+      const validGuests = Number.isInteger(guests) && guests >= 1 && guests <= 30;
 
-      let bookingTime = "20:30";
-      const timeMatch = clean.match(/(\d{1,2}(?::\d{2})?\s*(?:pm|am)?)/i);
-      if (timeMatch && (clean.includes("pm") || clean.includes("baje") || clean.includes("at"))) {
-        bookingTime = timeMatch[1];
+      if (!explicitBookingRequest || !validGuests || !hasDate || !validTime || !dateIsValid || !dateIsNotPast || !phoneMatch) {
+        return {
+          text: "Bhai, table ka zikr karne se main booking create nahi karunga. Agar aap waqai table book karna chahte hain to apni request is format mein bhejein: Book table, date: tomorrow (ya YYYY-MM-DD), time: 8:00 PM, guests: 4, phone: 03XXXXXXXXX. Booking details milne par hi request save hogi.",
+          suggestedQuestions: [
+            "Book table, date: tomorrow, time: 8:00 PM, guests: 4, phone: 03XXXXXXXXX",
+            "Meri bookings dikhao",
+            "Table reservation section kholo",
+          ],
+        };
       }
 
-      const tomorrow = new Date(Date.now() + 1000 * 60 * 60 * 24)
-        .toISOString()
-        .slice(0, 10);
+      let bookingDate = dateMatch?.[1] || "";
+      if (!bookingDate) {
+        const base = new Date();
+        if (/\b(tomorrow|kal)\b/.test(clean)) base.setDate(base.getDate() + 1);
+        bookingDate = [
+          base.getFullYear(),
+          String(base.getMonth() + 1).padStart(2, "0"),
+          String(base.getDate()).padStart(2, "0"),
+        ].join("-");
+      }
+      const bookingTime = timeMatch[1].replace(/\s*baje\b/i, "").trim();
       const newBooking = addReservation({
         name: customerName,
-        phone: "0300-1234567",
-        date: tomorrow,
+        phone: phoneMatch[0].replace(/[\s-]/g, ""),
+        date: bookingDate,
         time: bookingTime,
         guests,
         notes: "Booked via Al Madina AI Shahi Host",
@@ -795,16 +927,28 @@ export default function Chatbot() {
       clean.includes("rating") ||
       clean.includes("tareef");
 
-    if (isReviewIntent && (clean.includes("give") || clean.includes("submit") || clean.includes("likh") || clean.includes("5"))) {
-      let rating = 5;
-      if (clean.includes("4 star")) rating = 4;
-      if (clean.includes("3 star")) rating = 3;
-      if (clean.includes("1 star")) rating = 1;
+    if (isReviewIntent && (clean.includes("give") || clean.includes("submit") || clean.includes("likh") || /\b[1-5]\s*star/.test(clean) || clean.includes("review bhej"))) {
+      const ratingMatch = clean.match(/\b([1-5])\s*star/);
+      const rating = ratingMatch ? Number(ratingMatch[1]) : null;
+      const commentMatch = raw.match(/(?:comment|review|feedback|raaye)\s*[:\-]\s*(.+)/i);
+      const comment = commentMatch?.[1]?.trim();
+
+      if (!rating || !comment || comment.length < 3) {
+        return {
+          text: "Bhai, main aapki taraf se review ya tareef khud se nahi likhunga. Apna rating aur asli feedback is format mein bhejein: Review, 5 star, comment: Khana bohat acha tha.",
+          reviewPrompt: true,
+          suggestedQuestions: [
+            "Review, 5 star, comment: Khana bohat acha tha",
+            "Reviews section kholo",
+            "Menu dikhao",
+          ],
+        };
+      }
 
       const newReview = addReview({
         name: customerName,
         rating,
-        comment: raw.length > 15 ? raw : "Zabardast khana aur VIP service, boht maza aya!",
+        comment,
         status: "pending",
       });
 
@@ -882,7 +1026,13 @@ export default function Chatbot() {
     // --------------------------------------------------------
     // J. SERVER GEMINI AI CALL (Real conversational assistant)
     // --------------------------------------------------------
-    const geminiReply = await callServerGemini(raw);
+    const geminiReply = await callServerGemini(
+      raw,
+      messages.slice(-8).map((entry) => ({
+        role: entry.from === "bot" ? "model" : "user",
+        text: entry.text,
+      }))
+    );
     if (geminiReply) {
       return {
         text: geminiReply,

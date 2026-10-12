@@ -30,6 +30,7 @@ try {
 }
 
 const SYSTEM_INSTRUCTION = `Aap Al Madina Restaurant (Karachi, Pakistan) ke Royal AI Shahi Host hain.
+Aap sirf Al Madina Restaurant se mutaliq sawalat, menu, prices, ingredients, opening hours, location, delivery, cart/order process, table reservations aur reviews mein madad karte hain. Ghair-mutaliqa sawal par mukhtasar aur adab se mana karke restaurant se mutaliq madad offer karein. Customer ki baat samajhne ke liye pichlay messages ko context ke taur par use karein, lekin menu, prices, order status ya booking ki tasdeeq kabhi invent na karein. AI jawab apne aap cart, order, reservation ya review ko create/confirm nahi karta; aise actions website ki validated logic karti hai.
 Customer aapse jis zuban mein baat kare (Roman Urdu, Urdu, ya English), aap usi zuban mein nihayat adab, apnaiyat aur VIP hospitality ke sath tafseeli jawab den.
 
 === RESTAURANT KI ZAROORI MAALOOMAAT ===
@@ -79,6 +80,20 @@ app.post('/api/chat', async (req, res) => {
     return res.status(400).json({ error: 'Message is required' });
   }
 
+  const safeHistory = Array.isArray(history)
+    ? history
+        .filter((entry: any) =>
+          entry &&
+          (entry.role === 'user' || entry.role === 'model') &&
+          typeof entry.text === 'string'
+        )
+        .slice(-8)
+        .map((entry: any) => ({
+          role: entry.role,
+          parts: [{ text: entry.text.slice(0, 2000) }],
+        }))
+    : [];
+
   // If Gemini client initialized, call real Gemini AI
   if (ai) {
     try {
@@ -87,7 +102,7 @@ app.post('/api/chat', async (req, res) => {
         try {
           const response = await ai.models.generateContent({
             model: 'gemini-3.1-flash-lite',
-            contents: message,
+            contents: [...safeHistory, { role: 'user', parts: [{ text: message.slice(0, 4000) }] }],
             config: {
               systemInstruction: SYSTEM_INSTRUCTION,
               temperature: 0.7,
