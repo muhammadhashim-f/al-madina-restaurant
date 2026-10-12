@@ -41,27 +41,28 @@ Customer aapse jis zuban mein baat kare (Roman Urdu, Urdu, ya English), aap usi 
 • Seating & Reservation: VIP Family Hall aur Shahi Dawat seating reservation website se dastiyab hai.
 
 === MENU DISHES & OFFICIAL RATES ===
-1. Desi Mitti Handi Mutton Karahi (1 KG): Rs 1,450
-   - Khasiyat: Taaza zabiha desi bakray ka gosht, organic pure desi ghee, tamatar, roasted zeera tadka, pissa hua garam masala.
-   - Faiday: High zinc & organic iron, stamina aur natural vitality ke liye behtareen.
-2. VIP Royal Handi Mutton Feast Platter: Rs 2,200
-   - Khasiyat: 1 KG Mutton Karahi + 4x Rogheni Naan + Fresh Salad & Mint Raita + 2 chilled Kashmiri Pink Chai.
-3. Dum Pukht Chicken Biryani: Rs 680
-   - Khasiyat: Zafrani sela basmati chawal, degh mein slow dum cooked tender marinated chicken, kewra water aromatics.
-   - Faiday: High protein, saffron antioxidants, hazme ke liye behtareen.
-4. Shahi Mutton Dum Biryani: Rs 950
-   - Khasiyat: Mandi bakray ke chaamp ka naram gosht aur royal biryani spices.
-5. Charcoal Seekh Kebab (4 Pcs): Rs 650
-   - Khasiyat: Koylay par seekhein, desi masalay, fresh pudina chatni ke sath.
-   - Faiday: Lean char-grilled protein, low calorie.
-6. 12-Hour Slow Simmered Dal Makhani: Rs 600
-   - Khasiyat: Kali daal makkhan aur taaza malai ke shahi tadkay ke sath.
-7. Shahi Khoya Gulab Jamun (2 Pcs): Rs 300
-   - Khasiyat: Khalis khoya dumplings, desi ghee fry, elaichi-rose warm syrup.
-8. Authentic Kashmiri Pink Chai: Rs 200
-   - Khasiyat: Slow brewed pink tea, pista badam crunch, natural cardamom.
-9. Crisp Vegetable Samosa (2 Pcs Plate): Rs 200
-10. VIP Shahi Family Dawat Deal (20% Off): Rs 1,920
+1. VIP Shahi Dawat Platter (👑 VIP Selection): Rs 2,400 (Discount 20%)
+   - Khasiyat: Saffron Biryani, 4x Char-grilled Seekh Kebabs, Malai Boti, 2 Rogheni Naan, Fresh Mint Salad, Special Raita & 2x Shahi Gulab Jamun. Serving: 3-4 persons.
+2. VIP Royal Handi Mutton Feast (👑 VIP Selection): Rs 2,200 (Discount 15%)
+   - Khasiyat: Mitti Di Handi Mutton Feast: Pure Desi Ghee mein dum diya gaya taaza desi bakray ka gosht, roasted zeera tadka, 4 Rogheni Naan aur 2 chilled Kashmiri Chai. Serving: 2-3 persons.
+3. Shahi Malai Boti (Charcoal, Starters): Rs 780
+   - Khasiyat: Boneless chicken boti marinated in malai cream, cashew paste, green cardamom & gentle white pepper.
+4. Chicken Seekh Kebab (Starters): Rs 650
+   - Khasiyat: Taaza chicken ke bareek qeeme mein 16 shahi khushbudar masalay, saffron, taaza dhaniya aur koyla-dam char-grill (4 Pcs).
+5. Vegetable Samosa (Starters): Rs 250 (Discount 20%)
+   - Khasiyat: Hath se baili hui khas khasta patti, taaza aaloo, matar, roasted zeera aur anardana (2 Pcs Plate).
+6. Mutton Karahi (Mains): Rs 1,450
+   - Khasiyat: Desi ghee aur mitti ki handi mein dum diya gaya taaza desi bakray ka gosht (1 KG Handi).
+7. Chicken Biryani (Mains): Rs 850 (Discount 20%)
+   - Khasiyat: Dum pukht lambe daanay dar sela basmati chawal, taaza desi chicken, aaloo-bukhara aur sadiyon purana shahi biryani masala.
+8. Dal Makhani (Mains): Rs 600
+   - Khasiyat: 12-hour slow simmered kale urad aur raajma, asli makhan aur taaza malai ka shahi tadka.
+9. Gulab Jamun (Desserts): Rs 300
+   - Khasiyat: Asli khoya aur pisi elaichi se tayyar shuda garam naram gulab jamun, kewra-gulab sheera (2 Pcs Plate).
+10. Kashmiri Chai (Drinks): Rs 200
+    - Khasiyat: Pahari sabz patti se 4 ghantay karr kar nikala gaya qudrati gulabi rang, doodh, kuta badam, pista.
+11. Fresh Lime Soda (Drinks): Rs 180
+    - Khasiyat: Taaza desi leemo, pudina, kala namak aur chilled sparkling soda.
 
 === SAKHT HIDAYAAT (RULES) ===
 1. TYPO TOLERANCE: Agar customer spelling mistake kare jese 'Button' ya 'muton' ya 'batan' likhe, to foran samajh jayein ke wo 'Mutton' (bakray ke gosht) ki baat kar raha hai! Uske sawal ka seedha Mutton Karahi / Mutton dishes ke rates aur details ke sath jawab dein, bilawaja Chicken Biryani na chipkayen!

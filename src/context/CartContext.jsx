@@ -39,16 +39,16 @@ export function CartProvider({ children }) {
     } catch {}
   }, [items]);
 
-  const addToCart = (item, qty = 1) => {
-    const addAmount = Math.max(1, Number(qty) || 1);
+  const addToCart = (item, quantityToAdd = 1) => {
+    const qty = Math.max(1, Number(quantityToAdd) || 1);
     setItems((prev) => {
       const existing = prev.find((i) => i.id === item.id);
       if (existing) {
         return prev.map((i) =>
-          i.id === item.id ? { ...i, quantity: i.quantity + addAmount } : i
+          i.id === item.id ? { ...i, quantity: i.quantity + qty } : i
         );
       }
-      return [...prev, { ...item, quantity: addAmount }];
+      return [...prev, { ...item, quantity: qty }];
     });
   };
 
@@ -57,7 +57,10 @@ export function CartProvider({ children }) {
   };
 
   const updateQuantity = (id, quantity) => {
-    if (quantity < 1) return;
+    if (quantity <= 0) {
+      setItems((prev) => prev.filter((i) => i.id !== id));
+      return;
+    }
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, quantity } : i)));
   };
 

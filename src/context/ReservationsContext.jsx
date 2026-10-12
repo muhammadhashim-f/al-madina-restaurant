@@ -126,6 +126,23 @@ export function ReservationsProvider({ children }) {
     } catch {}
   };
 
+  const updateReservationDetails = (id, fields) => {
+    setReservations((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, ...fields } : r))
+    );
+
+    try {
+      supabase
+        .from("reservations")
+        .update({
+          ...fields,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", id)
+        .catch?.((e) => console.warn("[ReservationsContext] Supabase update details note:", e));
+    } catch {}
+  };
+
   const deleteReservation = (id) => {
     setReservations((prev) => prev.filter((r) => r.id !== id));
 
@@ -144,6 +161,7 @@ export function ReservationsProvider({ children }) {
         reservations,
         addReservation,
         updateReservationStatus,
+        updateReservationDetails,
         deleteReservation,
       }}
     >

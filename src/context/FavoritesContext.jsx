@@ -39,17 +39,16 @@ export function FavoritesProvider({ children }) {
 
   const isFavorite = (id) => favorites.some((f) => f.id === id);
 
-  const addToFavorites = (item) => {
-    if (!item) return;
-    const formatted = typeof item === "object" ? item : { id: item, name: "Dish", price: 0 };
-    setFavorites((prev) => {
-      if (prev.some((f) => f.id === formatted.id)) return prev;
-      return [...prev, formatted];
-    });
+  const addFavorite = (item) => {
+    setFavorites((prev) => (prev.some((f) => f.id === item.id) ? prev : [...prev, item]));
   };
 
-  const removeFromFavorites = (id) => {
+  const removeFavorite = (id) => {
     setFavorites((prev) => prev.filter((f) => f.id !== id));
+  };
+
+  const clearFavorites = () => {
+    setFavorites([]);
   };
 
   const toggleFavorite = (item) => {
@@ -61,7 +60,16 @@ export function FavoritesProvider({ children }) {
   };
 
   return (
-    <FavoritesContext.Provider value={{ favorites, isFavorite, addToFavorites, removeFromFavorites, toggleFavorite }}>
+    <FavoritesContext.Provider
+      value={{
+        favorites,
+        isFavorite,
+        toggleFavorite,
+        addFavorite,
+        removeFavorite,
+        clearFavorites,
+      }}
+    >
       {children}
     </FavoritesContext.Provider>
   );
