@@ -511,9 +511,15 @@ export default function Chatbot() {
       const parsedToRemove = parseMultiItemOrder(raw);
       if (parsedToRemove.length > 0) {
         parsedToRemove.forEach((p) => {
-          removeFromCart(p.item.id);
+          const inCart = cartItems.find((item) => item.id === p.item.id);
+          if (!inCart) return;
+          if (p.quantity < inCart.quantity) {
+            updateQuantity(p.item.id, inCart.quantity - p.quantity);
+          } else {
+            removeFromCart(p.item.id);
+          }
         });
-        const summary = parsedToRemove.map((p) => `• ${p.item.name}`).join("\n");
+        const summary = parsedToRemove.map((p) => `• ${p.quantity}x ${p.item.name}`).join("\n");
         return {
           text: `Bhai, aapke hukum par cart se yeh items remove kar diye gaye hain: 🗑️\n\n${summary}\n\nKiya aap mojooda cart ka updated bill dekhna chahte hain?`,
           suggestedQuestions: [
@@ -841,16 +847,28 @@ export default function Chatbot() {
       clean.includes("rating") ||
       clean.includes("tareef");
 
-    if (isReviewIntent && (clean.includes("give") || clean.includes("submit") || clean.includes("likh") || clean.includes("5"))) {
-      let rating = 5;
-      if (clean.includes("4 star")) rating = 4;
-      if (clean.includes("3 star")) rating = 3;
-      if (clean.includes("1 star")) rating = 1;
+    if (isReviewIntent && (clean.includes("give") || clean.includes("submit") || clean.includes("likh") || /\b[1-5]\s*star/.test(clean) || clean.includes("review bhej"))) {
+      const ratingMatch = clean.match(/\b([1-5])\s*star/);
+      const rating = ratingMatch ? Number(ratingMatch[1]) : null;
+      const commentMatch = raw.match(/(?:comment|review|feedback|raaye)\s*[:\-]\s*(.+)/i);
+      const comment = commentMatch?.[1]?.trim();
+
+      if (!rating || !comment || comment.length < 3) {
+        return {
+          text: "Bhai, main aapki taraf se review ya tareef khud se nahi likhunga. Apna rating aur asli feedback is format mein bhejein: Review, 5 star, comment: Khana bohat acha tha.",
+          reviewPrompt: true,
+          suggestedQuestions: [
+            "Review, 5 star, comment: Khana bohat acha tha",
+            "Reviews section kholo",
+            "Menu dikhao",
+          ],
+        };
+      }
 
       const newReview = addReview({
         name: customerName,
         rating,
-        comment: raw.length > 15 ? raw : "Zabardast khana aur VIP service, boht maza aya!",
+        comment,
         status: "pending",
       });
 
