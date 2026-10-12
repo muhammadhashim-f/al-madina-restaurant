@@ -787,7 +787,7 @@ export default function Chatbot() {
     if (isTableIntent) {
       // 1. Cancellation must identify the booking and confirm intent.
       if (clean.includes("cancel") || clean.includes("mansookh")) {
-        const bookingIdMatch = raw.match(/(?:booking|reservation)?\\s*#?\\s*(RES-?\\d+|\\d{4,})/i);
+        const bookingIdMatch = raw.match(/(?:booking|reservation)?\s*#?\s*(RES-?\d+|\d{4,})/i);
         const hasExplicitCancelConfirmation =
           clean.includes("confirm cancel") ||
           clean.includes("cancel booking #") ||
