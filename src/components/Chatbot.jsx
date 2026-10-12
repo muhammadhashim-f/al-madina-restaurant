@@ -859,11 +859,16 @@ export default function Chatbot() {
           ? timeHour >= 1 && timeHour <= 12
           : timeHour >= 0 && timeHour <= 23)
       );
-      const parsedDate = dateMatch ? new Date(dateMatch[1] + "T00:00:00") : null;
+      const dateParts = dateMatch ? dateMatch[1].split("-").map(Number) : null;
+      const parsedDate = dateParts
+        ? new Date(dateParts[0], dateParts[1] - 1, dateParts[2])
+        : null;
       const dateIsValid = !dateMatch || (
         parsedDate &&
         !Number.isNaN(parsedDate.getTime()) &&
-        parsedDate.toISOString().slice(0, 10) === dateMatch[1]
+        parsedDate.getFullYear() === dateParts[0] &&
+        parsedDate.getMonth() === dateParts[1] - 1 &&
+        parsedDate.getDate() === dateParts[2]
       );
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -885,7 +890,11 @@ export default function Chatbot() {
       if (!bookingDate) {
         const base = new Date();
         if (/\b(tomorrow|kal)\b/.test(clean)) base.setDate(base.getDate() + 1);
-        bookingDate = base.toISOString().slice(0, 10);
+        bookingDate = [
+          base.getFullYear(),
+          String(base.getMonth() + 1).padStart(2, "0"),
+          String(base.getDate()).padStart(2, "0"),
+        ].join("-");
       }
       const bookingTime = timeMatch[1].replace(/\s*baje\b/i, "").trim();
       const newBooking = addReservation({
