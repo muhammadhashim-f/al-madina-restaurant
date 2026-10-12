@@ -430,8 +430,18 @@ export default function Chatbot() {
       clean.includes("order book kar do");
 
     if (isConfirmIntent) {
-      const activeItems =
-        conversationContext.pendingProposal?.items || cartItems;
+      const activeItems = cartItems;
+
+      if (!activeItems || activeItems.length === 0) {
+        return {
+          text: "Bhai jaan, aapki cart is waqt khali hai! Pehle menu se koi dish muntakhib farmayein (maslan: 2 Chicken Biryani ya 1 Mutton Karahi), phir hum foran order place kar denge! 🛒",
+          suggestedQuestions: [
+            "Menu Section dikhao",
+            "2 Chicken Biryani cart mein add karo",
+            "1 Mutton Karahi add karo",
+          ],
+        };
+      }
 
       const phoneMatch = raw.match(/(?:\+?92|0)\d[\d\s-]{8,}/);
       const addressMatch = raw.match(/(?:address|pata|delivery address)\s*[:\-]?\s*(.+)/i);
@@ -442,17 +452,6 @@ export default function Chatbot() {
             "Mera bill batao",
             "Cart dikhao",
             "Order confirm karne ke liye details kya chahiye?",
-          ],
-        };
-      }
-
-      if (!activeItems || activeItems.length === 0) {
-        return {
-          text: "Bhai jaan, aapki cart is waqt khali hai! Pehle menu se koi dish muntakhib farmayein (maslan: 2 Chicken Biryani ya 1 Mutton Karahi), phir hum foran order place kar denge! 🛒",
-          suggestedQuestions: [
-            "Menu Section dikhao",
-            "2 Chicken Biryani cart mein add karo",
-            "1 Mutton Karahi add karo",
           ],
         };
       }
