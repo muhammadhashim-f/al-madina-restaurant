@@ -794,16 +794,38 @@ export default function Chatbot() {
       const guestMatch = clean.match(/(\d+)\s*(afraad|people|persons|guest|guests|banday|log)/);
       const guests = guestMatch ? parseInt(guestMatch[1], 10) : null;
       const phoneMatch = raw.match(/(?:\+?92|0)\d[\d\s-]{8,}/);
-      const timeMatch = clean.match(/\b(\d{1,2}(?::\d{2})?\s*(?:pm|am)?|\d{1,2}\s*baje)\b/i);
+      // A bare number such as "4 guests" must not be mistaken for a time.
+      const timeMatch = clean.match(/\b(\d{1,2}:\d{2}\s*(?:pm|am)?|\d{1,2}\s*(?:pm|am|baje))\b/i);
       const dateMatch = clean.match(/\b(20\d{2}-\d{2}-\d{2})\b/);
-      const hasDate = Boolean(dateMatch || /\b(today|tomorrow|aaj|kal)\b/.test(clean));
-      const hasTime = Boolean(timeMatch || /\b(\d{1,2})\s*(?:pm|am|baje)\b/.test(clean));
+      const relativeDateMatch = clean.match(/\b(today|tomorrow|aaj|kal)\b/);
+      const hasDate = Boolean(dateMatch || relativeDateMatch);
+      const timeParts = timeMatch?.[1].match(/^(\d{1,2})(?::(\d{2}))?\s*(pm|am|baje)?$/i);
+      const timeHour = timeParts ? Number(timeParts[1]) : NaN;
+      const timeMinute = timeParts?.[2] ? Number(timeParts[2]) : 0;
+      const timeSuffix = timeParts?.[3]?.toLowerCase();
+      const validTime = Boolean(
+        timeParts &&
+        timeMinute >= 0 && timeMinute <= 59 &&
+        (timeSuffix === "am" || timeSuffix === "pm"
+          ? timeHour >= 1 && timeHour <= 12
+          : timeHour >= 0 && timeHour <= 23)
+      );
+      const parsedDate = dateMatch ? new Date(dateMatch[1] + "T00:00:00") : null;
+      const dateIsValid = !dateMatch || (
+        parsedDate &&
+        !Number.isNaN(parsedDate.getTime()) &&
+        parsedDate.toISOString().slice(0, 10) === dateMatch[1]
+      );
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const dateIsNotPast = !dateMatch || (parsedDate && parsedDate >= today);
+      const validGuests = Number.isInteger(guests) && guests >= 1 && guests <= 30;
 
-      if (!explicitBookingRequest || !guests || !hasDate || !hasTime || !phoneMatch) {
+      if (!explicitBookingRequest || !validGuests || !hasDate || !validTime || !dateIsValid || !dateIsNotPast || !phoneMatch) {
         return {
           text: "Bhai, table ka zikr karne se main booking create nahi karunga. Agar aap waqai table book karna chahte hain to apni request is format mein bhejein: Book table, date: tomorrow (ya YYYY-MM-DD), time: 8:00 PM, guests: 4, phone: 03XXXXXXXXX. Booking details milne par hi request save hogi.",
           suggestedQuestions: [
-            "Kal 8 PM, 4 guests ke liye table book karni hai — phone number bhi doon?",
+            "Book table, date: tomorrow, time: 8:00 PM, guests: 4, phone: 03XXXXXXXXX",
             "Meri bookings dikhao",
             "Table reservation section kholo",
           ],
