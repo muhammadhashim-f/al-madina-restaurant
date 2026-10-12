@@ -52,7 +52,7 @@ import {
   saveChatMessage,
   SUPABASE_CHAT_TABLE_SQL,
 } from "../lib/chatService";
-import { isSupabaseConfigured } from "../lib/supabaseClient";
+import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
 
 // ============================================================
 // AL MADINA RESTAURANT — Admin Dashboard
@@ -63,10 +63,6 @@ import { isSupabaseConfigured } from "../lib/supabaseClient";
 // 4. Customer Profiles, Carts & Favorites (What dishes in cart & favorites)
 // 5. Website Settings (Phone 03070769139, Email, Address, Delivery Fee, Banner)
 // ============================================================
-
-function isAdminLoggedIn() {
-  return sessionStorage.getItem("am_admin_session") === "true";
-}
 
 const DEFAULT_SETTINGS = {
   restaurantName: "Al Madina Restaurant",
@@ -85,6 +81,35 @@ export default function AdminDashboard() {
   const { reservations, updateReservationStatus, deleteReservation } = useReservations();
   const { items: globalCartItems } = useCart();
   const { favorites: globalFavorites } = useFavorites();
+
+  const [adminAccess, setAdminAccess] = useState("checking");
+
+  useEffect(() => {
+    let active = true;
+    const verifyAdmin = async () => {
+      if (!isSupabaseConfigured) {
+        if (active) setAdminAccess("denied");
+        return;
+      }
+      try {
+        const { data: userData, error: userError } = await supabase.auth.getUser();
+        if (userError || !userData?.user) {
+          if (active) setAdminAccess("denied");
+          return;
+        }
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", userData.user.id)
+          .single();
+        if (active) setAdminAccess(!profileError && profile?.role === "admin" ? "allowed" : "denied");
+      } catch {
+        if (active) setAdminAccess("denied");
+      }
+    };
+    verifyAdmin();
+    return () => { active = false; };
+  }, []);
 
   const [activeTab, setActiveTab] = useState("orders"); // "orders" | "chats" | "reviews" | "reservations" | "customers" | "settings"
   const [rawChats, setRawChats] = useState([]);
@@ -129,8 +154,8 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
-    loadChats();
-  }, []);
+    if (adminAccess === "allowed") loadChats();
+  }, [adminAccess]);
 
   const sessions = useMemo(() => groupChatsBySession(rawChats), [rawChats]);
 
@@ -245,8 +270,9 @@ export default function AdminDashboard() {
     setSelectedSessionId(sampleSessionId);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     sessionStorage.removeItem("am_admin_session");
+    try { await supabase.auth.signOut(); } catch {}
     window.location.href = "/admin/login";
   };
 
@@ -457,7 +483,14 @@ export default function AdminDashboard() {
     { label: "Items in Cart", value: globalCartItems.length, icon: ShoppingCart },
   ];
 
-  if (!isAdminLoggedIn()) {
+  if (adminAccess === "checking") {
+    return (
+      <section className="min-h-screen flex items-center justify-center bg-[#0A0A0A] text-white">
+        <p>Verifying authorized staff access…</p>
+      </section>
+    );
+  }
+  if (adminAccess !== "allowed") {
     return <Navigate to="/admin/login" replace />;
   }
 
