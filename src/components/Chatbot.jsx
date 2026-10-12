@@ -707,6 +707,40 @@ export default function Chatbot() {
         };
       }
 
+      // Remove one specific dish from Favorites before handling bulk clearing.
+      const isRemovingOneFavorite =
+        clean.includes("remove") ||
+        clean.includes("remove from") ||
+        clean.includes("hata do") ||
+        clean.includes("nikal do") ||
+        clean.includes("unfavorite") ||
+        clean.includes("favorite se");
+      if (isRemovingOneFavorite) {
+        const dishToRemove = findDishByQuery(raw);
+        if (!dishToRemove) {
+          return {
+            text: "Bhai, kaunsi dish Favorites se remove karni hai? Dish ka naam bata dein.",
+            suggestedQuestions: [
+              "Chicken Biryani favorites se remove karo",
+              "Mutton Karahi favorites se remove karo",
+              "Meri favorites list dikhao",
+            ],
+          };
+        }
+        if (!favorites.some((item) => item.id === dishToRemove.id)) {
+          return {
+            text: `"${dishToRemove.name}" aapki Favorites list mein nahi hai, is liye kuch remove nahi kiya.`,
+            suggestedQuestions: ["Meri favorites list dikhao", "Menu dekho"],
+          };
+        }
+        removeFavorite(dishToRemove.id);
+        return {
+          text: `"${dishToRemove.name}" ko Favorites se remove kar diya hai.`,
+          product: dishToRemove,
+          suggestedQuestions: ["Meri favorites list dikhao", "Menu dekho"],
+        };
+      }
+
       // 3. Clear favorites
       if (clean.includes("remove all") || clean.includes("clear") || clean.includes("khatam")) {
         clearFavorites();
@@ -751,18 +785,33 @@ export default function Chatbot() {
       clean.includes("family hall");
 
     if (isTableIntent) {
-      // 1. Cancel booking
+      // 1. Cancellation must identify the booking and confirm intent.
       if (clean.includes("cancel") || clean.includes("mansookh")) {
-        if (reservations.length > 0) {
-          const lastRes = reservations[0];
-          deleteReservation(lastRes.id);
+        const bookingIdMatch = raw.match(/(?:booking|reservation)?\\s*#?\\s*(RES-?\\d+|\\d{4,})/i);
+        const hasExplicitCancelConfirmation =
+          clean.includes("confirm cancel") ||
+          clean.includes("cancel booking #") ||
+          clean.includes("cancel reservation #") ||
+          clean.includes("booking cancel kar do #");
+        if (!bookingIdMatch || !hasExplicitCancelConfirmation) {
           return {
-            text: `Bhai, aapki table booking #${lastRes.id} (${lastRes.guests} afraad, ${lastRes.date}) cancel kar di gayi hai.`,
-            suggestedQuestions: ["Nayi table book karein", "Menu dekhein"],
+            text: "Bhai, ghalti se booking cancel na ho is liye main bina booking ID aur clear confirmation ke cancel nahi karunga. Apni booking ID ke sath likhein: Confirm cancel booking #RES-12345. Pehle apni booking history check kar sakte hain.",
+            suggestedQuestions: ["Meri bookings dikhao", "Nayi table book karein", "Menu dekhein"],
           };
         }
+        const requestedId = bookingIdMatch[1].replace(/^RES-?/i, "");
+        const targetBooking = reservations.find((r) =>
+          String(r.id).replace(/^RES-?/i, "") === requestedId
+        );
+        if (!targetBooking) {
+          return {
+            text: "Bhai, yeh booking ID current booking list mein nahi mili. Apni booking history check karke sahi ID bhej dein.",
+            suggestedQuestions: ["Meri bookings dikhao", "Menu dekhein"],
+          };
+        }
+        deleteReservation(targetBooking.id);
         return {
-          text: "Aapki koi active booking record mein mojood nahi hai jise cancel kiya ja sakay.",
+          text: `Booking #${targetBooking.id} (${targetBooking.guests} afraad, ${targetBooking.date}) cancel kar di gayi hai.`,
           suggestedQuestions: ["Nayi table book karein", "Menu dekhein"],
         };
       }
