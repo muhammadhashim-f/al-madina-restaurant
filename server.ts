@@ -82,11 +82,11 @@ app.post('/api/chat', async (req, res) => {
   // If Gemini client initialized, call real Gemini AI
   if (ai) {
     try {
-      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000));
+      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000));
       const generatePromise = (async () => {
         try {
           const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3.8-flash',
             contents: message,
             config: {
               systemInstruction: SYSTEM_INSTRUCTION,
@@ -95,10 +95,10 @@ app.post('/api/chat', async (req, res) => {
           });
           return response.text?.trim() || null;
         } catch (e: any) {
-          console.warn('Gemini 2.5 flash error:', e?.message || e);
+          console.warn('Gemini 3.8 flash error, trying fallback:', e?.message || e);
           try {
             const fallbackRes = await ai.models.generateContent({
-              model: 'gemini-2.5-flash-lite',
+              model: 'gemini-3.1-flash-lite',
               contents: message,
               config: {
                 systemInstruction: SYSTEM_INSTRUCTION,
@@ -106,7 +106,8 @@ app.post('/api/chat', async (req, res) => {
               },
             });
             return fallbackRes.text?.trim() || null;
-          } catch {
+          } catch (e2: any) {
+            console.warn('Gemini fallback error:', e2?.message || e2);
             return null;
           }
         }

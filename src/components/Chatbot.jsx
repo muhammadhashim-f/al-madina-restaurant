@@ -33,12 +33,59 @@ import { MENU_ITEMS, RESTAURANT_METADATA } from "../data/menuData";
 import {
   normalizeInput,
   findDishByQuery,
-  filterDishesByCategory,
-  filterDishesByDiet,
   parseMultiItemOrder,
   calculateBill,
-  parseReservationDate,
+  handleRestaurantQuestions,
 } from "../utils/chatbotEngine";
+
+// Formats message text: Converts **bold** and *italic* cleanly into styled HTML without ANY raw asterisks (*)
+function renderFormattedMessage(text) {
+  if (!text) return null;
+
+  const lines = text.split("\n");
+
+  return lines.map((line, lineIdx) => {
+    const isBullet = line.trim().startsWith("•") || line.trim().startsWith("-");
+
+    const parts = [];
+    const boldTokens = line.split(/\*\*(.*?)\*\*/g);
+
+    boldTokens.forEach((token, bIdx) => {
+      if (bIdx % 2 === 1) {
+        // Bold token
+        parts.push(
+          <strong key={`b_${bIdx}`} className="font-bold text-[#F0DFA0]">
+            {token.replace(/\*/g, "")}
+          </strong>
+        );
+      } else {
+        // Regular token, may have italics *...*
+        const italicTokens = token.split(/\*(.*?)\*/g);
+        italicTokens.forEach((itToken, iIdx) => {
+          if (iIdx % 2 === 1) {
+            parts.push(
+              <em key={`i_${bIdx}_${iIdx}`} className="italic text-amber-200/90 font-medium">
+                {itToken.replace(/\*/g, "")}
+              </em>
+            );
+          } else {
+            // Strip any leftover stray asterisks
+            const cleanText = itToken.replace(/\*/g, "");
+            if (cleanText) {
+              parts.push(<span key={`t_${bIdx}_${iIdx}`}>{cleanText}</span>);
+            }
+          }
+        });
+      }
+    });
+
+    return (
+      <span key={lineIdx} className={`block ${lineIdx > 0 ? "mt-1" : ""} ${isBullet ? "pl-1.5" : ""}`}>
+        {parts.length > 0 ? parts : "\u00A0"}
+      </span>
+    );
+  });
+}
 
 // ============================================================
 // AL MADINA RESTAURANT — Royal AI Shahi Host & Action-Capable Assistant
@@ -112,11 +159,13 @@ export default function Chatbot() {
     favorites,
     isFavorite,
     addFavorite,
+    removeFavorite,
     clearFavorites,
   } = useFavorites();
   const {
     reservations,
     addReservation,
+    updateReservationDetails,
     deleteReservation,
   } = useReservations();
   const { orders, addOrder } = useOrders();
@@ -308,6 +357,7 @@ export default function Chatbot() {
   const processResponse = async (userText) => {
     const raw = userText.trim();
     const clean = normalizeInput(raw);
+    const lowerRaw = raw.toLowerCase();
 
     // --------------------------------------------------------
     // A. SECTION NAVIGATION
@@ -449,8 +499,9 @@ export default function Chatbot() {
         total: calculated.grandTotal,
       });
 
-      // Clear pending proposal
+      // Clear pending proposal and cart
       setConversationContext((prev) => ({ ...prev, pendingProposal: null }));
+      clearCart();
 
       return {
         text: `Bhai order complete successfully ho chuka hy (Order #${newOrder.id})! 🎉\n\nAb aap hamare official WhatsApp (${RESTAURANT_PHONE} / +92 300 1234567) pr payment wageera okay kare, pir jese hi owner ki trf se okay ka massage ay ga to pir apko tracking bike website pr live location me show ki jay gi k kahan Aap ka parsal aa giya hy 🛵\n\n(Bhai yaad rahe k jb tk owner okay nahi kare ga tb tk bike tracking me show nahi ki jay gi k kahan aa gai kun k abhi order pending me hy).`,
@@ -465,81 +516,41 @@ export default function Chatbot() {
     }
 
     // --------------------------------------------------------
-    // C. CART INSPECTION & CLEARING
-    // --------------------------------------------------------
-    const isViewCartIntent =
-      clean.includes("meri cart") ||
-      clean.includes("cart dikhao") ||
-      clean.includes("cart mein kya hai") ||
-      clean.includes("cart me kya hai") ||
-      clean.includes("view cart") ||
-      clean.includes("check cart") ||
-      clean.includes("cart check");
-
-    if (isViewCartIntent) {
-      if (!cartItems || cartItems.length === 0) {
-        return {
-          text: "Bhai jaan, aapki shahi dastarkhwan cart is waqt khali hai! 🛒\n\nAap menu se koi bhi lazeez dish jaise Mutton Karahi, Chicken Biryani ya Seekh Kebab muntakhib kar sakte hain.",
-          suggestedQuestions: [
-            "🍖 Mutton Karahi cart mein add karo",
-            "🍛 2 Chicken Biryani add karo",
-            "Menu Section dikhao",
-          ],
-        };
-      }
-      const calc = calculateBill(cartItems);
-      const lines = cartItems
-        .map((it) => `• ${it.quantity}x ${it.name} — Rs ${it.price * it.quantity}`)
-        .join("\n");
-      return {
-        text: `👑 **Aapki Live Shahi Cart (${cartItems.length} items):**\n\n${lines}\n\n💵 Subtotal: Rs ${calc.subtotal}\n🛵 Delivery Fee (All Karachi): Rs ${calc.deliveryFee}\n✨ **Kul Grand Total: Rs ${calc.grandTotal}**\n\nKiya aap abhi order confirm karna chahenge?`,
-        bill: {
-          items: calc.items.map((i) => ({
-            name: `${i.quantity}x ${i.name}`,
-            price: i.lineTotal,
-          })),
-          subtotal: calc.subtotal,
-          delivery: calc.deliveryFee,
-          grandTotal: calc.grandTotal,
-        },
-        suggestedQuestions: [
-          "📦 Haan Order Confirm Karein",
-          "Cart khali kar do",
-          "Kashmiri Chai bhi add karo",
-        ],
-      };
-    }
-
-    const isClearCartIntent =
-      clean.includes("clear cart") ||
-      clean.includes("cart khali") ||
-      clean.includes("empty cart") ||
-      clean.includes("cart saaf");
-
-    if (isClearCartIntent) {
-      clearCart();
-      return {
-        text: "Bhai, aapki shahi dastarkhwan cart mukammal taur par khali kar di gayi hai! 🗑️\n\nAgar aap dobara koi nai dish shamil karna chahein to hukum farmayein.",
-        suggestedQuestions: [
-          "Menu Section dikhao",
-          "2 Chicken Biryani add karo",
-          "Mutton Karahi add karo",
-        ],
-      };
-    }
-
-    // --------------------------------------------------------
-    // D. MULTI-ITEM ORDERING & CART UPDATES
-    // (e.g. "Add 2 burgers, 3 fries and 2 drinks", "ek mutton aur ek seekh kabab add karo")
+    // C. MULTI-ITEM ORDERING & CART UPDATES
+    // (e.g. "Add 2 burgers, 3 fries and 2 drinks", "ek samosa aur ek mutton order kro")
     // --------------------------------------------------------
     const isAddIntent =
       clean.includes("add") ||
       clean.includes("shamil") ||
       clean.includes("cart me") ||
       clean.includes("cart mein") ||
+      clean.includes("cart") ||
       clean.includes("mangwa") ||
+      clean.includes("mangwao") ||
       clean.includes("chahiye") ||
-      clean.includes("dal do");
+      clean.includes("order") ||
+      clean.includes("bhejo") ||
+      clean.includes("bhej do") ||
+      clean.includes("pack") ||
+      clean.includes("lagao") ||
+      clean.includes("kro") ||
+      clean.includes("karo") ||
+      clean.includes("kar do") ||
+      clean.includes("dal do") ||
+      clean.includes("daal do");
+
+    const isInfoQuery =
+      clean.includes("rate") ||
+      clean.includes("price") ||
+      clean.includes("keemat") ||
+      clean.includes("qemat") ||
+      clean.includes("recipe") ||
+      clean.includes("ingredients") ||
+      clean.includes("faiday") ||
+      clean.includes("benefits") ||
+      clean.includes("kya hota") ||
+      clean.includes("kaisa hota") ||
+      clean.includes("detail");
 
     const isRemoveIntent =
       clean.includes("remove") ||
@@ -567,13 +578,12 @@ export default function Chatbot() {
       }
     }
 
-    // Contextual: "Add another one" / "Isko cart mein dalo" / "Same thing again"
+    // Contextual: "Add another one" / "Make that two" / "Add the same thing again"
     if (
       clean.includes("add another") ||
       clean.includes("ek aur add") ||
       clean.includes("same thing again") ||
-      clean.includes("wohi dobara") ||
-      (isAddIntent && (clean.includes("isko") || clean.includes("isay") || clean.includes("ye dish")))
+      clean.includes("wohi dobara")
     ) {
       if (conversationContext.lastDishList.length > 0) {
         const dish = conversationContext.lastDishList[0];
@@ -590,9 +600,23 @@ export default function Chatbot() {
       }
     }
 
-    // Check multi-dish addition
+    // Check multi-dish and single-dish addition with high-precision parsing
     const parsedOrders = parseMultiItemOrder(raw);
-    if (parsedOrders.length > 0 && (isAddIntent || parsedOrders.length > 1)) {
+    const hasQuantityIndication =
+      /\b(ek|aik|do|teen|chaar|char|paanch|panch|chhe|che|saat|aath|nau|das|\d+)\b/.test(clean) ||
+      clean.includes("plate") ||
+      clean.includes("glass") ||
+      clean.includes("cup") ||
+      clean.includes("portion");
+
+    if (
+      parsedOrders.length > 0 &&
+      !isInfoQuery &&
+      (isAddIntent ||
+        parsedOrders.length > 1 ||
+        parsedOrders[0].quantity > 1 ||
+        hasQuantityIndication)
+    ) {
       parsedOrders.forEach((p) => {
         addToCart(
           {
@@ -641,14 +665,14 @@ export default function Chatbot() {
     }
 
     // --------------------------------------------------------
-    // E. BILL CALCULATION ("Calculate my bill", "total hisab", "kitna bana")
+    // D. BILL CALCULATION ("Calculate my bill", "total hisab", "kitna bana")
     // --------------------------------------------------------
     const isBillRequest =
       clean.includes("bill") ||
+      clean.includes("total") ||
       clean.includes("hisab") ||
       clean.includes("calculate") ||
       clean.includes("kitne paise") ||
-      clean.includes("kitna bana") ||
       clean.includes("how much");
 
     if (isBillRequest) {
@@ -694,120 +718,7 @@ export default function Chatbot() {
     }
 
     // --------------------------------------------------------
-    // F. MENU CATEGORIES DISCOVERY (Starters, Mains, Desserts, Drinks, VIP)
-    // --------------------------------------------------------
-    const isCategoryIntent =
-      clean.includes("starter") ||
-      clean.includes("starters") ||
-      clean.includes("main course") ||
-      clean.includes("mains") ||
-      clean.includes("dessert") ||
-      clean.includes("desserts") ||
-      clean.includes("mithai") ||
-      clean.includes("meetha") ||
-      clean.includes("drinks") ||
-      clean.includes("peene") ||
-      clean.includes("vip selection") ||
-      clean.includes("vip menu") ||
-      clean.includes("vip platter");
-
-    if (isCategoryIntent && !isAddIntent) {
-      let cat = "All";
-      if (clean.includes("starter")) cat = "Starters";
-      else if (clean.includes("main")) cat = "Mains";
-      else if (clean.includes("dessert") || clean.includes("meetha") || clean.includes("mithai")) cat = "Desserts";
-      else if (clean.includes("drink") || clean.includes("peene") || clean.includes("chai")) cat = "Drinks";
-      else if (clean.includes("vip")) cat = "👑 VIP Selection";
-
-      const matchedCatDishes = filterDishesByCategory(cat);
-      if (matchedCatDishes.length > 0) {
-        const dishSummary = matchedCatDishes
-          .map(
-            (d) =>
-              `• **${d.name}** — Rs ${d.price} (${d.serving || "1-2 persons"})\n  _${(d.description || "").slice(0, 85)}..._`
-          )
-          .join("\n\n");
-
-        return {
-          text: `👑 **Al Madina [${cat}] Collection:**\n\n${dishSummary}\n\nKiya in mein se koi lazeez dish aapki cart mein shamil ki jaye?`,
-          product: matchedCatDishes[0],
-          suggestedQuestions: matchedCatDishes.slice(0, 3).map((d) => `🛒 ${d.name} add karo`),
-        };
-      }
-    }
-
-    // --------------------------------------------------------
-    // G. DIETARY, SPICE & PREFERENCE FILTERS
-    // --------------------------------------------------------
-    const isDietaryIntent =
-      clean.includes("vegetarian") ||
-      clean.includes("veg khana") ||
-      clean.includes("sabzi") ||
-      clean.includes("spicy") ||
-      clean.includes("non spicy") ||
-      clean.includes("mild") ||
-      clean.includes("masaledar") ||
-      clean.includes("gosht") ||
-      clean.includes("mutton dishes");
-
-    if (isDietaryIntent && !isAddIntent) {
-      let diet = "veg";
-      if (clean.includes("non spicy") || clean.includes("mild")) diet = "mild";
-      else if (clean.includes("spicy") || clean.includes("masaledar")) diet = "spicy";
-      else if (clean.includes("mutton") || clean.includes("bakra")) diet = "mutton";
-      else if (clean.includes("gosht") || clean.includes("non-veg")) diet = "non-veg";
-
-      const dietDishes = filterDishesByDiet(diet);
-      if (dietDishes.length > 0) {
-        const lines = dietDishes
-          .map((d) => `• **${d.name}**: Rs ${d.price} (${d.isVeg ? "🥬 Pure Veg" : "🍖 Non-Veg"} · ${d.spicy ? "🌶️ Spicy" : "✨ Mild"})`)
-          .join("\n");
-        return {
-          text: `👑 **Al Madina [${diet.toUpperCase()}] Recommendations:**\n\n${lines}\n\nAap in mein se kisi bhi dish ko foran cart mein add kar sakte hain!`,
-          product: dietDishes[0],
-          suggestedQuestions: dietDishes.slice(0, 3).map((d) => `🛒 ${d.name} add karo`),
-        };
-      }
-    }
-
-    // --------------------------------------------------------
-    // H. RESTAURANT METADATA (TIMINGS, ADDRESS, DELIVERY, HALAL)
-    // --------------------------------------------------------
-    if (clean.includes("timing") || clean.includes("timings") || clean.includes("kab khulta") || clean.includes("kab band") || clean.includes("opening hours")) {
-      return {
-        text: `👑 **Al Madina Restaurant Timings:**\n\n⏰ **${RESTAURANT_METADATA.openingHours}**\n\nRozana dopahar 12:00 PM se raat 12:00 AM tak hamara shahi kitchen aur Karachi home delivery service active rehti hai!`,
-        suggestedQuestions: ["Menu dekhein", "Table book karein", "Delivery charges kitne hain?"],
-      };
-    }
-
-    if (clean.includes("location") || clean.includes("address") || clean.includes("pata") || clean.includes("kahan hai") || clean.includes("kidhar hai")) {
-      setTimeout(() => {
-        const el = document.getElementById("contact");
-        if (el) el.scrollIntoView({ behavior: "smooth" });
-      }, 150);
-      return {
-        text: `📍 **Al Madina Restaurant Address & Location:**\n\n🏢 **Pata:** ${RESTAURANT_METADATA.address}\n📞 **Phone/WhatsApp:** ${RESTAURANT_PHONE} / ${RESTAURANT_METADATA.phone}\n\n(Neeche Contact aur Google Map section par bhi scroll kar diya gaya hai). Karachi bhar mein shahi delivery aur dine-in family hall open hai!`,
-        whatsappSupport: true,
-        suggestedQuestions: ["Delivery charges kitne hain?", "Table book karein", "Menu dekhein"],
-      };
-    }
-
-    if (clean.includes("delivery") && (clean.includes("charge") || clean.includes("charges") || clean.includes("fee") || clean.includes("area") || clean.includes("rate") || clean.includes("kitne"))) {
-      return {
-        text: `🛵 **Karachi Home Delivery Details:**\n\n💵 **Delivery Charge:** Rs ${RESTAURANT_METADATA.deliveryFee} (Flat for all Karachi sectors)\n📍 **Delivery Coverage:** Karachi ke tamam ilaqe aur sectors\n⏱️ **Average Time:** 30-45 minutes\n🏍️ **Live GPS Bike Tracking:** Order owner ki tasdeeq (OK) ke baad website par live rider bike show hoti hai!\n\nKiya aap abhi koi order place karna chahte hain?`,
-        suggestedQuestions: ["2 Biryani cart mein add karo", "Mutton Karahi add karo", "Menu dikhao"],
-      };
-    }
-
-    if (clean.includes("halal") || clean.includes("halaal") || clean.includes("saaf suthra") || clean.includes("hygiene")) {
-      return {
-        text: `✨ **100% Halaal & Pure Desi Ghee Guarantee:**\n\nAl Madina Restaurant mein sirf shariat ke mutabiq zabah shuda taaza desi bakray aur taaza chicken ka gosht istemal hota hai. Tamam karahiyan asli desi ghee aur mitti ki handi mein koylay par dum pukht tayyar hoti hain. Zero artificial chemicals ya preservatives!`,
-        suggestedQuestions: ["Mutton Karahi ka rate?", "Chicken Biryani recipe?", "Menu dekhein"],
-      };
-    }
-
-    // --------------------------------------------------------
-    // I. FAVORITES MANAGEMENT
+    // E. FAVORITES MANAGEMENT
     // --------------------------------------------------------
     const isFavoritesManagement =
       clean.includes("favorite") ||
@@ -881,7 +792,7 @@ export default function Chatbot() {
     }
 
     // --------------------------------------------------------
-    // J. TABLE BOOKINGS & RESERVATION MANAGEMENT
+    // F. TABLE BOOKINGS & RESERVATION MANAGEMENT
     // --------------------------------------------------------
     const isTableIntent =
       clean.includes("table") ||
@@ -923,7 +834,7 @@ export default function Chatbot() {
         }
       }
 
-      // 3. New Booking with date & time extraction
+      // 3. New Booking
       let guests = 2;
       const guestMatch = clean.match(/(\d+)\s*(afraad|people|persons|guest|guests|banday)/);
       if (guestMatch) guests = parseInt(guestMatch[1], 10);
@@ -936,12 +847,13 @@ export default function Chatbot() {
         bookingTime = timeMatch[1];
       }
 
-      const bookingDate = parseReservationDate(raw);
-
+      const tomorrow = new Date(Date.now() + 1000 * 60 * 60 * 24)
+        .toISOString()
+        .slice(0, 10);
       const newBooking = addReservation({
         name: customerName,
         phone: "0300-1234567",
-        date: bookingDate,
+        date: tomorrow,
         time: bookingTime,
         guests,
         notes: "Booked via Al Madina AI Shahi Host",
@@ -959,7 +871,7 @@ export default function Chatbot() {
     }
 
     // --------------------------------------------------------
-    // K. REVIEWS & RATINGS ("give 5 stars", "submit review", "ratings")
+    // G. REVIEWS & RATINGS ("give 5 stars", "submit review", "ratings")
     // --------------------------------------------------------
     const isReviewIntent =
       clean.includes("review") ||
@@ -968,53 +880,39 @@ export default function Chatbot() {
       clean.includes("rating") ||
       clean.includes("tareef");
 
-    if (isReviewIntent) {
-      if (clean.includes("give") || clean.includes("submit") || clean.includes("likh") || clean.includes("5")) {
-        let rating = 5;
-        if (clean.includes("4 star")) rating = 4;
-        if (clean.includes("3 star")) rating = 3;
-        if (clean.includes("1 star")) rating = 1;
+    if (isReviewIntent && (clean.includes("give") || clean.includes("submit") || clean.includes("likh") || clean.includes("5"))) {
+      let rating = 5;
+      if (clean.includes("4 star")) rating = 4;
+      if (clean.includes("3 star")) rating = 3;
+      if (clean.includes("1 star")) rating = 1;
 
-        addReview({
-          name: customerName,
-          rating,
-          comment: raw.length > 15 ? raw : "Zabardast khana aur VIP service, boht maza aya!",
-          status: "pending",
-        });
+      const newReview = addReview({
+        name: customerName,
+        rating,
+        comment: raw.length > 15 ? raw : "Zabardast khana aur VIP service, boht maza aya!",
+        status: "pending",
+      });
 
-        return {
-          text: `Shukriya ${customerName}! Aapka ${rating}-Star review record kar liya gaya hai! ⭐⭐⭐⭐⭐\n\n(Aapko yeh review preview mein dikhayi dega, magar baqi public customers ko yeh Admin ki tasdeeq / OK ke baad nazar aayega taakay authenticity qaim rahay).`,
-          reviewPrompt: true,
-          suggestedQuestions: [
-            "Reviews section dekhein",
-            "Menu dekhein",
-            "Order place karein",
-          ],
-        };
-      }
-
-      // Inquire about reviews and ratings
       return {
-        text: `⭐ **Al Madina Customer Ratings & Reviews:**\n\n🌟 **Average Rating:** ${averageRating || "4.9"} / 5.0 (VIP Top Rated)\n👥 **Reviews Count:** ${reviews?.length || 24} Verified Diners\n💬 **Recent Customer Praise:** "Mutton Karahi aur Chicken Biryani dono ka zaiqa bemisal hai, authentic desi ghee zaiqa!"\n\nKiya aap bhi apna 5-star review darj karna chahte hain?`,
+        text: `Shukriya ${customerName}! Aapka ${rating}-Star review record kar liya gaya hai! ⭐⭐⭐⭐⭐\n\n(Aapko yeh review preview mein dikhayi dega, magar baqi public customers ko yeh Admin ki tasdeeq / OK ke baad nazar aayega taakay authenticity qaim rahay).`,
         reviewPrompt: true,
         suggestedQuestions: [
-          "5 star review: Zabardast khana!",
           "Reviews section dekhein",
           "Menu dekhein",
+          "Order place karein",
         ],
       };
     }
 
     // --------------------------------------------------------
-    // L. ORDER STATUS & TRACKING ("Where is my order", "order number")
+    // H. ORDER STATUS & TRACKING ("Where is my order", "order number")
     // --------------------------------------------------------
     const isOrderStatusIntent =
       clean.includes("where is my order") ||
       clean.includes("order status") ||
       clean.includes("kahan hai mera order") ||
       clean.includes("order track") ||
-      clean.includes("order number") ||
-      clean.includes("rider");
+      clean.includes("order number");
 
     if (isOrderStatusIntent) {
       if (orders.length > 0) {
@@ -1045,15 +943,18 @@ export default function Chatbot() {
     }
 
     // --------------------------------------------------------
-    // M. EXACT DISH INQUIRY / PRICING / INGREDIENTS
+    // I. AUTHORITATIVE RESTAURANT KNOWLEDGE Q&A
+    // (Cheapest, Most Expensive, Budgets, Veg, Spicy, Deals, Operations)
     // --------------------------------------------------------
-    const specificDish = findDishByQuery(raw) || (
-      (clean.includes("iska") || clean.includes("isay") || clean.includes("ye dish")) &&
-      conversationContext.lastDishList.length > 0
-        ? conversationContext.lastDishList[0]
-        : null
-    );
+    const knowledgeResponse = handleRestaurantQuestions(clean, raw);
+    if (knowledgeResponse) {
+      return knowledgeResponse;
+    }
 
+    // --------------------------------------------------------
+    // J. EXACT DISH INQUIRY / PRICING / INGREDIENTS
+    // --------------------------------------------------------
+    const specificDish = findDishByQuery(raw);
     if (specificDish) {
       setConversationContext((prev) => ({
         ...prev,
@@ -1140,11 +1041,11 @@ export default function Chatbot() {
     setInput("");
     setIsTyping(true);
 
-    // 2.2 seconds animated restaurant logo typing indicator
+    // 800ms smooth animated restaurant logo typing indicator
     setTimeout(async () => {
       const response = await processResponse(text);
       streamBotMessage(response, updatedMessages);
-    }, 2200);
+    }, 800);
   };
 
   // Chat Sessions Management
@@ -1790,7 +1691,9 @@ export default function Chatbot() {
           <div className="am-chat-body" ref={scrollRef}>
             {messages.map((m) => (
               <div key={m.id} className={`am-bubble ${m.from}`}>
-                <p>{m.text}</p>
+                <div className="whitespace-pre-line leading-relaxed text-xs">
+                  {renderFormattedMessage(m.text)}
+                </div>
 
                 {/* Interactive Multi-Item Cart / Order Card */}
                 {cartItems && cartItems.length > 0 && m.from === "bot" && (m.bill || m.text.includes("shahi dastarkhwan cart")) && (
@@ -2025,7 +1928,9 @@ export default function Chatbot() {
             {/* Pen-style Typewriter streaming in progress */}
             {typewriterText && (
               <div className="am-bubble bot">
-                <p>{typewriterText}</p>
+                <div className="whitespace-pre-line leading-relaxed text-xs">
+                  {renderFormattedMessage(typewriterText)}
+                </div>
                 <span className="inline-block w-1.5 h-3.5 bg-[#D4AF37] ml-0.5 animate-pulse" />
               </div>
             )}
