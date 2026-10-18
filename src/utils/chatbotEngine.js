@@ -4,33 +4,38 @@
 // favorites, reservations, reviews, order status, and context memory.
 // ============================================================
 
-import { MENU_ITEMS, RESTAURANT_METADATA } from "../data/menuData";
+import { MENU_ITEMS, RESTAURANT_METADATA, CATEGORIES } from "../data/menuData";
 
 // Normalizes input for typos and Roman Urdu transliterations
 export function normalizeInput(raw) {
   let s = (raw || "").toLowerCase().trim();
-  // Typo fixes for Mutton (handles "Button", "buttn", "muton", "matan", etc.)
-  s = s.replace(/\b(button|buttn|butten|muton|matan|muttn|maton|batan|bton|bakra|bakray|gosht)\b/g, "mutton");
-  s = s.replace(/bryani|baryani|beryani|biriyani/g, "biryani");
-  s = s.replace(/krhai|krahi|karhi|kadai|kadhai/g, "karahi");
-  s = s.replace(/kebabz|kabab|kabaabs|tikka|kababs|kebabs/g, "kebab");
-  s = s.replace(/samosay|samose|smosa|samosas/g, "samosa");
-  s = s.replace(/daal|makhni|dall/g, "makhani");
-  s = s.replace(/mitha|metha|gulabjaman|jalebi/g, "gulab jamun");
-  s = s.replace(/kashmiri chai|pink tea|chai/g, "chai");
-  s = s.replace(/limon|limu|nimbu|lime soda/g, "fresh lime soda");
-  s = s.replace(/whatapp|whatsap|whtsapp|watsapp/g, "whatsapp");
-  s = s.replace(/adrs|adrees|adress|locashun|loction/g, "location");
-  s = s.replace(/\b(bil|total|hisab|calculate)\b/g, "bill");
-  s = s.replace(/\b(keemat|qemat|qimat|kimat|price|rates|daam|cost)\b/g, "price");
-  s = s.replace(/\b(ordr|ordar|bok)\b/g, "order");
-  s = s.replace(/\b(pasand|favourite|favorite|fav)\b/g, "favorites");
-  s = s.replace(/\b(table|maiz|mez|baithna|seat)\b/g, "table");
+
+  // Typo fixes for Mutton (handles "Button", "buttn", "muton", "matan", "bakra", "gosht", etc.)
+  s = s.replace(/\b(button|buttn|butten|muton|matan|muttn|maton|batan|bton|bakra|bakray|gosht|bakray ka gosht)\b/g, "mutton");
+  s = s.replace(/\b(bryani|baryani|beryani|biriyani|chawal|biryani chawal)\b/g, "biryani");
+  s = s.replace(/\b(krhai|krahi|karhi|kadai|kadhai|salan|handi)\b/g, "karahi");
+  s = s.replace(/\b(kebabz|kabab|kabaabs|tikka|kababs|kebabs|seekh)\b/g, "kebab");
+  s = s.replace(/\b(samosay|samose|smosa|samosas|somosa)\b/g, "samosa");
+  s = s.replace(/\b(daal|makhni|dall|dal)\b/g, "makhani");
+  s = s.replace(/\b(mitha|metha|gulabjaman|jalebi|meetha|mithai|sweet|dessert|desserts)\b/g, "gulab jamun");
+  s = s.replace(/\b(kashmiri chai|pink tea|chai|tea|qehwa|kehwa|sabz chai)\b/g, "chai");
+  s = s.replace(/\b(limon|limu|nimbu|lime soda|lemonade|soda|cold drink|sharbat)\b/g, "fresh lime soda");
+  s = s.replace(/\b(whatapp|whatsap|whtsapp|watsapp|wa)\b/g, "whatsapp");
+  s = s.replace(/\b(adrs|adrees|adress|locashun|loction|kahan hai|kidhar hai|pata|address)\b/g, "location");
+  s = s.replace(/\b(timings|timing|time|waqt|kab khulta hai|kab band hota hai|hours|opening)\b/g, "timings");
+  s = s.replace(/\b(bil|total|hisab|calculate|kitna bana|kitnay banay|kitna bill|grand total)\b/g, "bill");
+  s = s.replace(/\b(keemat|qemat|qimat|kimat|price|rates|daam|cost|kitne ka|kitne ki|kitne paise)\b/g, "price");
+  s = s.replace(/\b(ordr|ordar|bok|mangwana|order place|order confirm)\b/g, "order");
+  s = s.replace(/\b(pasand|favourite|favorite|fav|favourate|like)\b/g, "favorites");
+  s = s.replace(/\b(table|maiz|mez|baithna|seat|family hall|seating|dine in|booking|reservation)\b/g, "table");
+  s = s.replace(/\b(halal|halaal|saaf|hygiene|clean|preservative)\b/g, "halal");
+  s = s.replace(/\b(rider|tracking|bike|kahan pohncha|kahan pohancha|live location|dispatch)\b/g, "tracking");
+
   return s;
 }
 
 // Word-to-number dictionary
-const WORD_TO_NUM = {
+export const WORD_TO_NUM = {
   ek: 1, aik: 1, one: 1, a: 1, an: 1,
   do: 2, two: 2,
   teen: 3, three: 3,
@@ -44,17 +49,17 @@ const WORD_TO_NUM = {
 };
 
 // Item keyword mappings pointing to exact MENU_ITEMS ID
-const DISH_KEYWORDS = [
-  { id: 101, keywords: ["shahi dawat platter", "vip platter", "dawat platter", "family platter", "combo platter", "sultan e karachi", "platter"] },
-  { id: 102, keywords: ["royal handi feast", "handi mutton feast", "mutton feast", "handi feast", "mitti di handi mutton feast"] },
-  { id: 103, keywords: ["malai boti", "shahi malai boti", "boti", "charcoal boti"] },
+export const DISH_KEYWORDS = [
+  { id: 101, keywords: ["shahi dawat platter", "vip platter", "dawat platter", "family platter", "combo platter", "sultan e karachi", "platter", "shahi platter"] },
+  { id: 102, keywords: ["royal handi feast", "handi mutton feast", "mutton feast", "handi feast", "mitti di handi mutton feast", "royal handi", "handi mutton"] },
+  { id: 103, keywords: ["malai boti", "shahi malai boti", "boti", "charcoal boti", "chicken boti"] },
   { id: 1, keywords: ["seekh kebab", "chicken seekh kebab", "seekh kabab", "kebab", "kabab"] },
-  { id: 2, keywords: ["vegetable samosa", "samosa", "samose", "samosay", "veg samosa"] },
-  { id: 3, keywords: ["mutton karahi", "karahi", "mutton handi", "desi mitti handi mutton"] },
-  { id: 4, keywords: ["chicken biryani", "biryani", "chawal", "dum pukht biryani", "rice"] },
+  { id: 2, keywords: ["vegetable samosa", "samosa", "samose", "samosay", "veg samosa", "khasta samosa"] },
+  { id: 3, keywords: ["mutton karahi", "karahi", "mutton handi", "desi mitti handi mutton", "mutton"] },
+  { id: 4, keywords: ["chicken biryani", "biryani", "dum pukht biryani", "rice", "biryani rice"] },
   { id: 5, keywords: ["dal makhani", "daal makhani", "dal", "makhani", "daal"] },
-  { id: 6, keywords: ["gulab jamun", "meetha", "mithai", "dessert", "jamun"] },
-  { id: 7, keywords: ["kashmiri chai", "pink tea", "chai", "qehwa", "tea"] },
+  { id: 6, keywords: ["gulab jamun", "meetha", "mithai", "dessert", "jamun", "gulab"] },
+  { id: 7, keywords: ["kashmiri chai", "pink tea", "chai", "qehwa", "tea", "sabz chai"] },
   { id: 8, keywords: ["fresh lime soda", "lime soda", "soda", "fresh lime", "lemonade"] },
 ];
 
@@ -70,8 +75,52 @@ export function findDishByQuery(str) {
   return null;
 }
 
+// Find dishes by category or dietary filter
+export function filterDishesByCategory(cat) {
+  const c = (cat || "").toLowerCase();
+  if (c.includes("vip")) {
+    return MENU_ITEMS.filter((m) => m.isVIP || m.category.includes("VIP"));
+  }
+  if (c.includes("starter")) {
+    return MENU_ITEMS.filter((m) => m.category === "Starters");
+  }
+  if (c.includes("main")) {
+    return MENU_ITEMS.filter((m) => m.category === "Mains");
+  }
+  if (c.includes("dessert") || c.includes("meetha")) {
+    return MENU_ITEMS.filter((m) => m.category === "Desserts");
+  }
+  if (c.includes("drink") || c.includes("chai") || c.includes("beverage")) {
+    return MENU_ITEMS.filter((m) => m.category === "Drinks");
+  }
+  return MENU_ITEMS;
+}
+
+export function filterDishesByDiet(dietType) {
+  const d = (dietType || "").toLowerCase();
+  if (d === "veg" || d === "vegetarian" || d === "sabzi") {
+    return MENU_ITEMS.filter((m) => m.isVeg);
+  }
+  if (d === "non-veg" || d === "gosht" || d === "meat") {
+    return MENU_ITEMS.filter((m) => !m.isVeg);
+  }
+  if (d === "spicy" || d === "masaledar" || d === "chattpata") {
+    return MENU_ITEMS.filter((m) => m.spicy);
+  }
+  if (d === "mild" || d === "non-spicy" || d === "saada") {
+    return MENU_ITEMS.filter((m) => !m.spicy);
+  }
+  if (d === "mutton" || d === "bakra") {
+    return MENU_ITEMS.filter((m) => m.name.toLowerCase().includes("mutton"));
+  }
+  if (d === "chicken") {
+    return MENU_ITEMS.filter((m) => m.name.toLowerCase().includes("chicken") || m.name.toLowerCase().includes("boti"));
+  }
+  return MENU_ITEMS;
+}
+
 // Parse multi-item order requests like:
-// "Mujhe 2 Zinger Burgers aur 3 cold drinks order karni hain"
+// "Mujhe 2 Chicken Biryani aur 3 Kashmiri Chai order karni hain"
 // "ek mutton aur ek seekh kabab aur ek samosa add to cart kr do"
 export function parseMultiItemOrder(text) {
   const clean = normalizeInput(text);
@@ -121,7 +170,7 @@ export function parseMultiItemOrder(text) {
           const item = MENU_ITEMS.find((m) => m.id === dk.id);
           if (item && !matched.some((m) => m.item.id === item.id)) {
             // Check if quantity precedes keyword
-            const qtyRegex = new RegExp(`(\\d+|ek|aik|do|teen|chaar|char|paanch|panch|chhe|che)\\s*(?:x|plate|plates|kg|handi)?\\s*${kw}`);
+            const qtyRegex = new RegExp(`(\\d+|ek|aik|do|teen|chaar|char|paanch|panch|chhe|che)\\s*(?:x|plate|plates|kg|handi|cup|glass)?\\s*${kw}`);
             const qm = clean.match(qtyRegex);
             let q = 1;
             if (qm) {
@@ -160,4 +209,30 @@ export function calculateBill(items) {
     grandTotal,
     currency: RESTAURANT_METADATA.currency,
   };
+}
+
+// Date parser for table reservations ("aaj", "today", "kal", "tomorrow", "parso")
+export function parseReservationDate(text) {
+  const s = (text || "").toLowerCase();
+  const now = new Date();
+
+  if (s.includes("aaj") || s.includes("today")) {
+    return now.toISOString().slice(0, 10);
+  }
+  if (s.includes("kal") || s.includes("tomorrow")) {
+    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    return tomorrow.toISOString().slice(0, 10);
+  }
+  if (s.includes("parso") || s.includes("day after tomorrow")) {
+    const dayAfter = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+    return dayAfter.toISOString().slice(0, 10);
+  }
+
+  // Look for YYYY-MM-DD or DD-MM-YYYY
+  const dateMatch = s.match(/\b(\d{4}-\d{2}-\d{2})\b/);
+  if (dateMatch) return dateMatch[1];
+
+  // Default to tomorrow
+  const def = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  return def.toISOString().slice(0, 10);
 }

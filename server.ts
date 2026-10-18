@@ -86,7 +86,7 @@ app.post('/api/chat', async (req, res) => {
       const generatePromise = (async () => {
         try {
           const response = await ai.models.generateContent({
-            model: 'gemini-3.1-flash-lite',
+            model: 'gemini-2.5-flash',
             contents: message,
             config: {
               systemInstruction: SYSTEM_INSTRUCTION,
@@ -95,8 +95,20 @@ app.post('/api/chat', async (req, res) => {
           });
           return response.text?.trim() || null;
         } catch (e: any) {
-          console.warn('Gemini 3.1 flash lite error:', e?.message || e);
-          return null;
+          console.warn('Gemini 2.5 flash error:', e?.message || e);
+          try {
+            const fallbackRes = await ai.models.generateContent({
+              model: 'gemini-2.5-flash-lite',
+              contents: message,
+              config: {
+                systemInstruction: SYSTEM_INSTRUCTION,
+                temperature: 0.7,
+              },
+            });
+            return fallbackRes.text?.trim() || null;
+          } catch {
+            return null;
+          }
         }
       })();
 
