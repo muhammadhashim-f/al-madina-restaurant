@@ -14,19 +14,18 @@ const PORT = parseInt(process.env.PORT || '3000', 10);
 
 app.use(express.json());
 
-// Initialize Google Gemini AI SDK
-const rawKey = process.env.GEMINI_API_KEY;
-const geminiApiKey = rawKey && rawKey !== 'MY_GEMINI_API_KEY' && !rawKey.includes('PLACEHOLDER') ? rawKey : null;
-let ai: GoogleGenAI | null = null;
-try {
-  if (geminiApiKey) {
-    ai = new GoogleGenAI({ apiKey: geminiApiKey });
-    console.log('GoogleGenAI initialized with active API key.');
-  } else {
-    console.log('No external Gemini API key provided; intelligent built-in AI host enabled.');
+// Initialize Google Gemini AI SDK helper
+function getAIClient(): GoogleGenAI | null {
+  const rawKey = process.env.GEMINI_API_KEY;
+  if (!rawKey || rawKey === 'MY_GEMINI_API_KEY' || rawKey.includes('PLACEHOLDER')) {
+    return null;
   }
-} catch (err) {
-  console.warn('GoogleGenAI initialization warning:', err);
+  try {
+    return new GoogleGenAI({ apiKey: rawKey });
+  } catch (err) {
+    console.warn('GoogleGenAI initialization warning:', err);
+    return null;
+  }
 }
 
 const SYSTEM_INSTRUCTION = `Aap Al Madina Restaurant (Karachi, Pakistan) ke Royal AI Shahi Host hain.
@@ -48,19 +47,36 @@ Customer aapse jis zuban mein baat kare (Roman Urdu, Urdu, ya English), aap usi 
 
 // API Route for AI Chatbot
 app.post('/api/chat', async (req, res) => {
-  const { message } = req.body;
+  const { message, history } = req.body;
   if (!message || typeof message !== 'string') {
     return res.status(400).json({ error: 'Message is required' });
   }
 
+  const ai = getAIClient();
   if (ai) {
     try {
-      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000));
+      const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
+      if (Array.isArray(history)) {
+        for (const entry of history) {
+          if (entry && typeof entry.text === 'string' && (entry.role === 'user' || entry.role === 'model')) {
+            contents.push({
+              role: entry.role,
+              parts: [{ text: entry.text.slice(0, 2000) }],
+            });
+          }
+        }
+      }
+      contents.push({
+        role: 'user',
+        parts: [{ text: message.trim().slice(0, 4000) }],
+      });
+
+      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 6000));
       const generatePromise = (async () => {
         try {
           const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
-            contents: message,
+            contents,
             config: {
               systemInstruction: SYSTEM_INSTRUCTION,
               temperature: 0.7,
@@ -72,7 +88,7 @@ app.post('/api/chat', async (req, res) => {
           try {
             const fallbackRes = await ai.models.generateContent({
               model: 'gemini-2.5-flash-lite',
-              contents: message,
+              contents,
               config: {
                 systemInstruction: SYSTEM_INSTRUCTION,
                 temperature: 0.7,

@@ -37,7 +37,6 @@ import {
   filterDishesByDiet,
   parseMultiItemOrder,
   calculateBill,
-  parseReservationDate,
 } from "../utils/chatbotEngine";
 
 // ============================================================
@@ -116,11 +115,10 @@ export default function Chatbot() {
   } = useFavorites();
   const {
     reservations,
-    addReservation,
     deleteReservation,
   } = useReservations();
   const { orders, addOrder } = useOrders();
-  const { reviews, addReview, averageRating } = useReviews();
+  const { reviews, averageRating } = useReviews();
   const { triggerLoader } = useVIPLoader();
   const authContext = useAuth();
   const [sidebarTab, setSidebarTab] = useState("active"); // "active" | "archived" | "trash"
@@ -1623,9 +1621,9 @@ export default function Chatbot() {
                                   <p className="truncate font-semibold">{sess.title}</p>
                                   <p className="text-[10px] text-white/40">
                                     {sess.messages?.length || 1} messages ·{" "}
-                                    {new Date(
-                                      sess.createdAt || Date.now()
-                                    ).toLocaleDateString()}
+                                    {sess.createdAt
+                                      ? new Date(sess.createdAt).toLocaleDateString()
+                                      : "Recent"}
                                   </p>
                                 </div>
                               )}
