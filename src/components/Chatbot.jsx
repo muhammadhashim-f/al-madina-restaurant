@@ -287,12 +287,18 @@ export default function Chatbot() {
   };
 
   // Call Server-Side Gemini API Proxy (/api/chat)
-  const callServerGemini = async (prompt) => {
+  const callServerGemini = async (prompt, history = []) => {
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: prompt }),
+        body: JSON.stringify({
+          message: prompt,
+          history: history.slice(-8).map((entry) => ({
+            role: entry.role === "model" || entry.from === "bot" ? "model" : "user",
+            text: entry.text,
+          })),
+        }),
       });
       if (!res.ok) return null;
       const data = await res.json();
@@ -421,8 +427,7 @@ export default function Chatbot() {
       clean.includes("order book kar do");
 
     if (isConfirmIntent) {
-      const activeItems =
-        conversationContext.pendingProposal?.items || cartItems;
+      const activeItems = cartItems;
 
       if (!activeItems || activeItems.length === 0) {
         return {
@@ -435,27 +440,7 @@ export default function Chatbot() {
         };
       }
 
-      // Check if user has provided delivery address and phone
-      const phoneMatch = raw.match(/(?:03\d{2}[-\s]?\d{7}|\+92\s?3\d{2}[-\s]?\d{7})/);
-      const userPhone = phoneMatch ? phoneMatch[0] : (currentUser?.user_metadata?.phone || null);
 
-      let userAddress = null;
-      if (
-        raw.toLowerCase().includes("address:") ||
-        raw.toLowerCase().includes("pata:") ||
-        raw.toLowerCase().includes("sector") ||
-        raw.toLowerCase().includes("korangi") ||
-        raw.toLowerCase().includes("gulshan") ||
-        raw.toLowerCase().includes("defence") ||
-        raw.toLowerCase().includes("clifton") ||
-        raw.toLowerCase().includes("phase")
-      ) {
-        userAddress = raw;
-      } else if (currentUser?.user_metadata?.address) {
-        userAddress = currentUser.user_metadata.address;
-      }
-
-      const hasDirectDetails = userPhone || userAddress;
       const calculated = calculateBill(activeItems);
 
       if (!hasDirectDetails && !clean.includes("haan confirm") && !clean.includes("direct")) {
@@ -485,8 +470,7 @@ export default function Chatbot() {
         status: "awaiting_approval",
         customer: {
           name: customerName,
-          phone: userPhone || "0300-1234567",
-          address: userAddress || "Karachi Home Delivery (Awaiting WhatsApp Confirmation)",
+
         },
         total: calculated.grandTotal,
       });
@@ -595,9 +579,15 @@ export default function Chatbot() {
       const parsedToRemove = parseMultiItemOrder(raw);
       if (parsedToRemove.length > 0) {
         parsedToRemove.forEach((p) => {
-          removeFromCart(p.item.id);
+          const inCart = cartItems.find((item) => item.id === p.item.id);
+          if (!inCart) return;
+          if (p.quantity < inCart.quantity) {
+            updateQuantity(p.item.id, inCart.quantity - p.quantity);
+          } else {
+            removeFromCart(p.item.id);
+          }
         });
-        const summary = parsedToRemove.map((p) => `• ${p.item.name}`).join("\n");
+        const summary = parsedToRemove.map((p) => `• ${p.quantity}x ${p.item.name}`).join("\n");
         return {
           text: `Bhai, aapke hukum par cart se yeh items remove kar diye gaye hain: 🗑️\n\n${summary}\n\nKiya aap mojooda cart ka updated bill dekhna chahte hain?`,
           suggestedQuestions: [
@@ -899,31 +889,46 @@ export default function Chatbot() {
         };
       }
 
+      // Remove one specific dish from Favorites before handling bulk clearing.
+      const isRemovingOneFavorite =
+        clean.includes("remove") ||
+        clean.includes("remove from") ||
+        clean.includes("hata do") ||
+        clean.includes("nikal do") ||
+        clean.includes("unfavorite") ||
+        clean.includes("favorite se");
+      if (isRemovingOneFavorite) {
+        const dishToRemove = findDishByQuery(raw);
+        if (!dishToRemove) {
+          return {
+            text: "Bhai, kaunsi dish Favorites se remove karni hai? Dish ka naam bata dein.",
+            suggestedQuestions: [
+              "Chicken Biryani favorites se remove karo",
+              "Mutton Karahi favorites se remove karo",
+              "Meri favorites list dikhao",
+            ],
+          };
+        }
+        if (!favorites.some((item) => item.id === dishToRemove.id)) {
+          return {
+            text: `"${dishToRemove.name}" aapki Favorites list mein nahi hai, is liye kuch remove nahi kiya.`,
+            suggestedQuestions: ["Meri favorites list dikhao", "Menu dekho"],
+          };
+        }
+        removeFavorite(dishToRemove.id);
+        return {
+          text: `"${dishToRemove.name}" ko Favorites se remove kar diya hai.`,
+          product: dishToRemove,
+          suggestedQuestions: ["Meri favorites list dikhao", "Menu dekho"],
+        };
+      }
+
       // 3. Clear favorites
       if (clean.includes("remove all") || clean.includes("clear") || clean.includes("khatam")) {
         clearFavorites();
         return {
           text: "Aapki tamam favorite dishes Favorites list se remove kar di gayi hain.",
           suggestedQuestions: ["Menu dekhein", "New dishes favorite karein"],
-        };
-      }
-
-      // 4. Add specific dish to favorites
-      const dishToFav = findDishByQuery(raw) || (
-        (clean.includes("isko") || clean.includes("isay") || clean.includes("ye dish")) &&
-        conversationContext.lastDishList.length > 0
-          ? conversationContext.lastDishList[0]
-          : null
-      );
-
-      if (!dishToFav) {
-        return {
-          text: "Aap konsi dish favorites mein shamil karna chahte hain? Maslan: Chicken Biryani, Mutton Karahi, ya Seekh Kebab?",
-          suggestedQuestions: [
-            "Chicken Biryani favorite karo",
-            "Mutton Karahi favorite karo",
-            "Menu dekhein",
-          ],
         };
       }
 
@@ -950,18 +955,33 @@ export default function Chatbot() {
       clean.includes("family hall");
 
     if (isTableIntent) {
-      // 1. Cancel booking
+      // 1. Cancellation must identify the booking and confirm intent.
       if (clean.includes("cancel") || clean.includes("mansookh")) {
-        if (reservations.length > 0) {
-          const lastRes = reservations[0];
-          deleteReservation(lastRes.id);
+        const bookingIdMatch = raw.match(/(?:booking|reservation)?\s*#?\s*(RES-?\d+|\d{4,})/i);
+        const hasExplicitCancelConfirmation =
+          clean.includes("confirm cancel") ||
+          clean.includes("cancel booking #") ||
+          clean.includes("cancel reservation #") ||
+          clean.includes("booking cancel kar do #");
+        if (!bookingIdMatch || !hasExplicitCancelConfirmation) {
           return {
-            text: `Bhai, aapki table booking #${lastRes.id} (${lastRes.guests} afraad, ${lastRes.date}) cancel kar di gayi hai.`,
-            suggestedQuestions: ["Nayi table book karein", "Menu dekhein"],
+            text: "Bhai, ghalti se booking cancel na ho is liye main bina booking ID aur clear confirmation ke cancel nahi karunga. Apni booking ID ke sath likhein: Confirm cancel booking #RES-12345. Pehle apni booking history check kar sakte hain.",
+            suggestedQuestions: ["Meri bookings dikhao", "Nayi table book karein", "Menu dekhein"],
           };
         }
+        const requestedId = bookingIdMatch[1].replace(/^RES-?/i, "");
+        const targetBooking = reservations.find((r) =>
+          String(r.id).replace(/^RES-?/i, "") === requestedId
+        );
+        if (!targetBooking) {
+          return {
+            text: "Bhai, yeh booking ID current booking list mein nahi mili. Apni booking history check karke sahi ID bhej dein.",
+            suggestedQuestions: ["Meri bookings dikhao", "Menu dekhein"],
+          };
+        }
+        deleteReservation(targetBooking.id);
         return {
-          text: "Aapki koi active booking record mein mojood nahi hai jise cancel kiya ja sakay.",
+          text: `Booking #${targetBooking.id} (${targetBooking.guests} afraad, ${targetBooking.date}) cancel kar di gayi hai.`,
           suggestedQuestions: ["Nayi table book karein", "Menu dekhein"],
         };
       }
@@ -982,121 +1002,6 @@ export default function Chatbot() {
         }
       }
 
-      // 3. Just asking how to book or procedure inquiry
-      const isBookingInquiry =
-        clean.includes("kaise") ||
-        clean.includes("procedure") ||
-        clean.includes("tareeqa") ||
-        clean.includes("rules") ||
-        clean.includes("kya tareeqa") ||
-        clean.includes("options");
-
-      const guestMatch = clean.match(/(\d+)\s*(afraad|people|persons|guest|guests|banday)/);
-      const timeMatch = clean.match(/(\d{1,2}(?::\d{2})?\s*(?:pm|am)?)/i);
-      const hasSpecificDetails =
-        guestMatch ||
-        clean.includes("kal") ||
-        clean.includes("tomorrow") ||
-        clean.includes("aaj") ||
-        clean.includes("today") ||
-        (timeMatch && (clean.includes("pm") || clean.includes("baje")));
-
-      if (isBookingInquiry && !hasSpecificDetails) {
-        return {
-          text: `👑 **Al Madina Shahi Table Reservation:**\n\nFamily Hall aur Royal Dining booking ke liye aap mujhe sirf:\n• **Mehmaano ki tadaad** (Guests)\n• **Tareeq** (Date: Aaj, Kal, etc.)\n• **Waqt** (Time)\n• **Phone number**\n\nbatayein (Maslan: *"Kal raat 8:30 baje 4 logon ki table book karo"*). Main foran booking submit kar doon ga!`,
-          suggestedQuestions: [
-            "📅 Kal raat 8:30 baje 4 logon ki table book karo",
-            "📅 Aaj raat 9 baje 2 logon ki table",
-            "Meri mojooda bookings dikhao",
-          ],
-        };
-      }
-
-      // 4. New Booking with date & time extraction
-      let guests = 2;
-      if (guestMatch) guests = parseInt(guestMatch[1], 10);
-      else if (clean.includes("char") || clean.includes("4")) guests = 4;
-      else if (clean.includes("family")) guests = 6;
-
-      let bookingTime = "20:30";
-      if (timeMatch && (clean.includes("pm") || clean.includes("baje") || clean.includes("at"))) {
-        bookingTime = timeMatch[1];
-      }
-
-      const bookingDate = parseReservationDate(raw);
-      const phoneMatch = raw.match(/(?:03\d{2}[-\s]?\d{7}|\+92\s?3\d{2}[-\s]?\d{7})/);
-      const contactPhone = phoneMatch ? phoneMatch[0] : (currentUser?.user_metadata?.phone || "0300-1234567");
-
-      const newBooking = addReservation({
-        name: customerName,
-        phone: contactPhone,
-        date: bookingDate,
-        time: bookingTime,
-        guests,
-        notes: "Booked via Al Madina AI Shahi Host",
-        status: "pending",
-      });
-
-      return {
-        text: `👑 **Shahi Table Booking Request Receive Ho Gayi Hai!**\n\n📋 Booking ID: #${newBooking.id}\n👤 Mehmaan: ${newBooking.name}\n📞 Rabta Number: ${newBooking.phone}\n👥 VIP Seating: ${newBooking.guests} Afraad (Family Hall)\n📅 Tareeq: ${newBooking.date} · ⏰ Waqt: ${newBooking.time}\n\n⏳ **Status: Pending Owner Approval**\n\n(Note: Pehle yeh booking pending rahegi, jaise hi restaurant owner check kar ke **OK** karenge to status Confirmed ho jayega. Yeh details aapki Booking History mein bhi live save ho chuki hain!)`,
-        suggestedQuestions: [
-          "📅 Booking History Dekhein",
-          "📱 WhatsApp Owner se rabta",
-          "Menu se dishes order karein",
-        ],
-      };
-    }
-
-    // --------------------------------------------------------
-    // K. REVIEWS & RATINGS ("give 5 stars", "submit review", "ratings")
-    // --------------------------------------------------------
-    const isReviewIntent =
-      clean.includes("review") ||
-      clean.includes("star") ||
-      clean.includes("rate") ||
-      clean.includes("rating") ||
-      clean.includes("tareef");
-
-    if (isReviewIntent) {
-      if (clean.includes("give") || clean.includes("submit") || clean.includes("likh") || clean.includes("star")) {
-        const hasRating = clean.includes("1") || clean.includes("2") || clean.includes("3") || clean.includes("4") || clean.includes("5");
-        let rating = 5;
-        if (clean.includes("4 star") || clean.includes("4/5")) rating = 4;
-        else if (clean.includes("3 star") || clean.includes("3/5")) rating = 3;
-        else if (clean.includes("2 star") || clean.includes("2/5")) rating = 2;
-        else if (clean.includes("1 star") || clean.includes("1/5")) rating = 1;
-
-        // If user just typed "review dena hai" without feedback or rating:
-        if (!hasRating && raw.length < 15) {
-          return {
-            text: `Khushamdeed ${customerName}! Aap hamare khane aur service ko kitne stars (1 se 5) dena chahenge, aur aapka tajruba kaisa raha?\n\nMaslan: *"5 star: Biryani aur Mutton Karahi boht lazeez thi!"*`,
-            reviewPrompt: true,
-            suggestedQuestions: [
-              "5 star: Boht shandar khana aur VIP service!",
-              "4 star: Khana lazeez tha, service thodi tez karein",
-              "Reviews section dekhein",
-            ],
-          };
-        }
-
-        const commentText = raw.replace(/\b(5|4|3|2|1)\s*star\b/gi, "").trim();
-        addReview({
-          name: customerName,
-          rating,
-          comment: commentText.length > 5 ? commentText : "Zabardast khana aur VIP service, boht maza aya!",
-          status: "pending",
-        });
-
-        return {
-          text: `Shukriya ${customerName}! Aapka ${rating}-Star review record kar liya gaya hai! ⭐⭐⭐⭐⭐\n\n(Aapko yeh review preview mein dikhayi dega, magar baqi public customers ko yeh Admin ki tasdeeq / OK ke baad nazar aayega taakay authenticity qaim rahay).`,
-          reviewPrompt: true,
-          suggestedQuestions: [
-            "Reviews section dekhein",
-            "Menu dekhein",
-            "Order place karein",
-          ],
-        };
-      }
 
       // Inquire about reviews and ratings
       return {
@@ -1180,7 +1085,13 @@ export default function Chatbot() {
     // --------------------------------------------------------
     // J. SERVER GEMINI AI CALL (Real conversational assistant)
     // --------------------------------------------------------
-    const geminiReply = await callServerGemini(raw);
+    const geminiReply = await callServerGemini(
+      raw,
+      messages.slice(-8).map((entry) => ({
+        role: entry.from === "bot" ? "model" : "user",
+        text: entry.text,
+      }))
+    );
     if (geminiReply) {
       return {
         text: geminiReply,

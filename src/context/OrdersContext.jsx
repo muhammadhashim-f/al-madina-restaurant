@@ -99,6 +99,7 @@ export function OrdersProvider({ children }) {
         .from("orders")
         .insert({
           id: newOrder.id,
+          user_id: newOrder.userId || null,
           customer_name: newOrder.customer?.name || "Customer",
           customer_phone: newOrder.customer?.phone || "N/A",
           customer_email: newOrder.customer?.email || "",

@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { supabase } from "../lib/supabaseClient";
 
 // ============================================================
 // AL MADINA RESTAURANT — Cart Context
@@ -20,23 +19,10 @@ export function CartProvider({ children }) {
     }
   });
 
+  // Guest carts stay in this browser until authenticated per-customer sync exists.
+  // Never write every visitor's cart to one shared Supabase row.
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-
-    // Sync to Supabase carts table
-    try {
-      const total = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
-      supabase
-        .from("carts")
-        .upsert({
-          id: "cart_active_session",
-          customer_identifier: "active_customer",
-          items: items,
-          total: total,
-          updated_at: new Date().toISOString(),
-        })
-        .catch?.((err) => console.warn("[CartContext] Supabase sync note:", err));
-    } catch {}
   }, [items]);
 
   const addToCart = (item, quantityToAdd = 1) => {

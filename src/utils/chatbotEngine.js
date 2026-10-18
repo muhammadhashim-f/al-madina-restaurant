@@ -153,8 +153,10 @@ export function parseMultiItemOrder(text) {
       for (const kw of dk.keywords) {
         if (trimmed.includes(kw)) {
           const item = MENU_ITEMS.find((m) => m.id === dk.id);
-          if (item && !matched.some((m) => m.item.id === item.id)) {
-            matched.push({ item, quantity: Math.max(1, quantity) });
+          if (item) {
+            const existing = matched.find((m) => m.item.id === item.id);
+            if (existing) existing.quantity += Math.max(1, quantity);
+            else matched.push({ item, quantity: Math.max(1, quantity) });
           }
           break;
         }
@@ -168,7 +170,7 @@ export function parseMultiItemOrder(text) {
       for (const kw of dk.keywords) {
         if (clean.includes(kw)) {
           const item = MENU_ITEMS.find((m) => m.id === dk.id);
-          if (item && !matched.some((m) => m.item.id === item.id)) {
+          if (item) {
             // Check if quantity precedes keyword
             const qtyRegex = new RegExp(`(\\d+|ek|aik|do|teen|chaar|char|paanch|panch|chhe|che)\\s*(?:x|plate|plates|kg|handi|cup|glass)?\\s*${kw}`);
             const qm = clean.match(qtyRegex);
@@ -177,7 +179,9 @@ export function parseMultiItemOrder(text) {
               const val = qm[1];
               q = parseInt(val, 10) || WORD_TO_NUM[val] || 1;
             }
-            matched.push({ item, quantity: Math.max(1, q) });
+            const existing = matched.find((m) => m.item.id === item.id);
+            if (existing) existing.quantity += Math.max(1, q);
+            else matched.push({ item, quantity: Math.max(1, q) });
           }
           break;
         }

@@ -1,13 +1,12 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
 import { ShieldCheck, Mail, Lock } from "lucide-react";
 
 // ============================================================
 // AL MADINA RESTAURANT — Admin Login
-// Demo-only auth: hardcoded credentials, session flag in
-// sessionStorage. Will be replaced by real role-based Supabase
-// auth (checking a "role = admin" field) once backend is wired.
-// Demo login: admin@almadina.pk / admin123
+// Admin access is verified with Supabase Auth and profiles.role.
+// Never ship a hardcoded admin password in the browser.
 // ============================================================
 
 export default function AdminLogin() {
@@ -16,13 +15,41 @@ export default function AdminLogin() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (email === "admin@almadina.pk" && password === "admin123") {
+    setError("");
+
+    if (!isSupabaseConfigured) {
+      setError("Admin login is disabled because Supabase is not configured. Configure Supabase Auth and create an admin profile first.");
+      return;
+    }
+
+    try {
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      if (authError || !authData?.user) {
+        setError("Login failed. Check your credentials and try again.");
+        return;
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", authData.user.id)
+        .single();
+
+      if (profileError || profile?.role !== "admin") {
+        await supabase.auth.signOut();
+        setError("This account is not authorized for the admin dashboard.");
+        return;
+      }
+
       sessionStorage.setItem("am_admin_session", "true");
       navigate("/admin/dashboard");
-    } else {
-      setError("Invalid admin credentials.");
+    } catch {
+      setError("Unable to verify admin access. Check Supabase configuration and try again.");
     }
   };
 
@@ -107,8 +134,8 @@ export default function AdminLogin() {
           <button type="submit" className="am-admin-submit">Log in to Admin</button>
         </form>
 
-        <p className="text-xs text-center mt-5" style={{ color: "rgba(255,255,255,0.35)" }}>
-          Demo credentials: admin@almadina.pk / admin123
+        <p className="text-xs text-center mt-5" style={{ color: "rgba(255,255,255,0.5)" }}>
+          Authorized staff accounts only. Admin access must be enabled by the project owner in Supabase.
         </p>
       </div>
     </section>
